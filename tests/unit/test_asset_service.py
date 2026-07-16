@@ -88,7 +88,6 @@ async def test_list_assets(db_session: AsyncSession) -> None:
     await service.create_asset(AssetCreate(name="Asset B", asset_type=AssetType.DAM))
     await service.create_asset(AssetCreate(name="Asset C", asset_type=AssetType.DAM))
     
-    paginated = await service.list_assets(page=1, page_size=2)
-    assert paginated.total == 3
-    assert len(paginated.items) == 2
-    assert paginated.pages == 2
+    items, total = await service.list_assets(page=1, page_size=2)
+    assert total == 3
+    assert len(items) == 2

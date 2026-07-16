@@ -45,13 +45,12 @@ async def list_assets(
     page_size: int = Query(default=20, ge=1, le=100, description="Items per page."),
 ) -> PaginatedResponse[AssetResponse]:
     """Paginated asset list."""
-    result = await service.list_assets(page=page, page_size=page_size)
-    return PaginatedResponse[AssetResponse](
-        items=[AssetResponse.model_validate(a) for a in result.items],
-        total=result.total,
-        page=result.page,
-        page_size=result.page_size,
-        pages=result.pages,
+    items, total = await service.list_assets(page=page, page_size=page_size)
+    return PaginatedResponse[AssetResponse].build(
+        items=[AssetResponse.model_validate(a) for a in items],
+        total=total,
+        page=page,
+        page_size=page_size,
     )
 
 

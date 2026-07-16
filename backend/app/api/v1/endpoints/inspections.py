@@ -50,13 +50,12 @@ async def list_inspections(
     page_size: int = Query(default=20, ge=1, le=100, description="Items per page."),
 ) -> PaginatedResponse[InspectionResponse]:
     """Paginated inspection list."""
-    result = await service.list_inspections(page=page, page_size=page_size)
-    return PaginatedResponse[InspectionResponse](
-        items=[InspectionResponse.model_validate(i) for i in result.items],
-        total=result.total,
-        page=result.page,
-        page_size=result.page_size,
-        pages=result.pages,
+    items, total = await service.list_inspections(page=page, page_size=page_size)
+    return PaginatedResponse[InspectionResponse].build(
+        items=[InspectionResponse.model_validate(i) for i in items],
+        total=total,
+        page=page,
+        page_size=page_size,
     )
 
 

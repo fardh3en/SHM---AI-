@@ -16,7 +16,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.app.models.asset import Asset
 from backend.app.repositories.asset_repository import AssetRepository
 from backend.app.schemas.asset import AssetCreate, AssetUpdate
-from backend.app.schemas.common import PaginatedResponse
 from backend.app.services.base import BaseService
 
 logger = logging.getLogger(__name__)
@@ -57,7 +56,7 @@ class AssetService(BaseService):
         self,
         page: int = 1,
         page_size: int = 20,
-    ) -> PaginatedResponse[Asset]:
+    ) -> tuple[list[Asset], int]:
         """
         Return a paginated list of all assets.
 
@@ -66,10 +65,11 @@ class AssetService(BaseService):
             page_size: Results per page (max 100).
 
         Returns:
-            PaginatedResponse wrapping a list of Asset ORM objects.
+            Tuple of (Asset ORM objects for the requested page, total record count).
+            Callers (typically API endpoints) are responsible for wrapping this
+            in a PaginatedResponse[ResponseSchema] using their own Pydantic schema.
         """
-        items, total = await self._repo.get_all(page=page, page_size=page_size)
-        return PaginatedResponse.build(items, total, page, page_size)
+        return await self._repo.get_all(page=page, page_size=page_size)
 
     async def update_asset(self, asset_id: str, data: AssetUpdate) -> Asset | None:
         """

@@ -14,7 +14,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.app.models.inspection import Inspection
 from backend.app.repositories.asset_repository import AssetRepository
 from backend.app.repositories.inspection_repository import InspectionRepository
-from backend.app.schemas.common import PaginatedResponse
 from backend.app.schemas.inspection import InspectionCreate, InspectionUpdate
 from backend.app.services.base import BaseService
 
@@ -62,13 +61,19 @@ class InspectionService(BaseService):
         self,
         page: int = 1,
         page_size: int = 20,
-    ) -> PaginatedResponse[Inspection]:
-        """Return a paginated list of all inspections, newest first."""
-        items, total = await self._repo.get_all(
+    ) -> tuple[list[Inspection], int]:
+        """
+        Return a paginated list of all inspections, newest first.
+
+        Returns:
+            Tuple of (Inspection ORM objects for the requested page, total record count).
+            Callers (typically API endpoints) are responsible for wrapping this
+            in a PaginatedResponse[ResponseSchema] using their own Pydantic schema.
+        """
+        return await self._repo.get_all(
             page=page,
             page_size=page_size,
         )
-        return PaginatedResponse.build(items, total, page, page_size)
 
     async def list_inspections_for_asset(self, asset_id: str) -> list[Inspection]:
         """Return all inspections for a specific asset (newest first)."""
