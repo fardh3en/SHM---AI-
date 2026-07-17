@@ -1,12 +1,13 @@
 """
 Inspection API endpoints.
 
-Manage the inspection lifecycle for structural assets.
-Phase 2 will add a /run endpoint that triggers the vision engine.
+Manage the inspection lifecycle for structural assets, including triggering
+the Phase 2 computer vision pipeline via POST /{id}/run.
 """
 from fastapi import APIRouter, HTTPException, Query, status
 
-from backend.app.dependencies import InspectionServiceDep
+from backend.app.core.exceptions import SHMBaseException
+from backend.app.dependencies import CVPipelineDep, InspectionServiceDep
 from backend.app.schemas.common import PaginatedResponse
 from backend.app.schemas.inspection import InspectionCreate, InspectionResponse, InspectionUpdate
 
@@ -20,7 +21,7 @@ router = APIRouter(prefix="/inspections", tags=["Inspections"])
     summary="Create a new inspection record",
     description=(
         "Creates an inspection record for an asset in PENDING status. "
-        "Phase 2 will extend this to automatically trigger the vision engine."
+        "Call POST /{id}/run afterwards to trigger the vision engine."
     ),
     responses={404: {"description": "Asset not found"}},
 )
@@ -113,6 +114,46 @@ async def update_inspection(
 ) -> InspectionResponse:
     """Partial update of an inspection."""
     inspection = await service.update_inspection(inspection_id, data)
+    if inspection is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Inspection '{inspection_id}' not found.",
+        )
+    return InspectionResponse.model_validate(inspection)
+
+
+@router.post(
+    "/{inspection_id}/run",
+    response_model=InspectionResponse,
+    summary="Run the vision pipeline for an inspection",
+    description=(
+        "Synchronously executes the computer vision pipeline (detection, "
+        "measurement, and defect persistence) against the inspection's "
+        "input_path. The request blocks until processing completes — "
+        "there is no background job queue in this phase, so this may take "
+        "several seconds depending on image size and model. On success, "
+        "the inspection is marked COMPLETED with defect_count and "
+        "processing_time_ms populated, and Detection records are created. "
+        "On a vision pipeline failure, the inspection is marked FAILED with "
+        "error_message populated and this endpoint still returns 200 "
+        "(check the response body's status field, not just the HTTP code)."
+    ),
+    responses={
+        404: {"description": "Inspection not found"},
+        422: {"description": "Inspection has no input_path, or is already processing/completed"},
+    },
+)
+async def run_inspection(
+    inspection_id: str,
+    service: InspectionServiceDep,
+    pipeline: CVPipelineDep,
+) -> InspectionResponse:
+    """Trigger synchronous vision pipeline execution for an inspection."""
+    try:
+        inspection = await service.run_inspection(inspection_id, pipeline)
+    except SHMBaseException as exc:
+        raise HTTPException(status_code=exc.http_status, detail=exc.message) from exc
+
     if inspection is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
