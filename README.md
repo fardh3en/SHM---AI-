@@ -87,7 +87,7 @@ pytest tests/ -v
 |---|---|---|
 | 1 — Foundation | ✅ **Complete** | FastAPI, SQLAlchemy, DI, CRUD API |
 | 2 — Vision Engine | ✅ **Complete** | YOLO11 detection, segmentation, measurements |
-| 3 — Health Intelligence | 🔜 Pending | Health scoring, severity, failure modes |
+| 3 — Health Intelligence | ✅ **Complete** |Health scoring, severity classification, engineering rules, risk assessment |
 | 4 — Degradation | 🔜 Pending | Carbonation, corrosion, service life |
 | 5 — Recommendations | 🔜 Pending | Repair actions, PDF reports |
 | 6 — Dashboard | 🔜 Pending | Streamlit monitoring UI |
