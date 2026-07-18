@@ -86,7 +86,7 @@ pytest tests/ -v
 | Phase | Status | Description |
 |---|---|---|
 | 1 — Foundation | ✅ **Complete** | FastAPI, SQLAlchemy, DI, CRUD API |
-| 2 — Vision Engine | 🔜 Pending | YOLO11 detection, segmentation, measurements |
+| 2 — Vision Engine | ✅ **Complete** | YOLO11 detection, segmentation, measurements |
 | 3 — Health Intelligence | 🔜 Pending | Health scoring, severity, failure modes |
 | 4 — Degradation | 🔜 Pending | Carbonation, corrosion, service life |
 | 5 — Recommendations | 🔜 Pending | Repair actions, PDF reports |
