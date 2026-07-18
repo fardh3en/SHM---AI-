@@ -23,6 +23,8 @@ import logging
 import time
 from pathlib import Path
 
+import numpy as np
+
 from backend.app.core.exceptions import InferenceError
 from vision.detectors.base import IDetector, RawDetection
 from vision.pipeline.base import IInferencePipeline
@@ -123,7 +125,7 @@ class CVInferencePipeline(IInferencePipeline):
         return results
 
     def _run_full_frame(
-        self, image, img_width: int, img_height: int
+        self, image: np.ndarray, img_width: int, img_height: int
     ) -> list[DetectionResult]:
         """Run inference on the whole image as a single frame (no tiling)."""
         raw_detections = self._detector.predict(image)
@@ -134,7 +136,9 @@ class CVInferencePipeline(IInferencePipeline):
             for raw in raw_detections
         ]
 
-    def _run_sliced(self, image, img_width: int, img_height: int) -> list[DetectionResult]:
+    def _run_sliced(
+        self, image: np.ndarray, img_width: int, img_height: int
+    ) -> list[DetectionResult]:
         """Run inference tile-by-tile and project results back to full-image space."""
         results: list[DetectionResult] = []
 
@@ -166,8 +170,8 @@ class CVInferencePipeline(IInferencePipeline):
         Convert a single RawDetection (tile or full-frame space) into a fully
         measured, normalised DetectionResult in full-image coordinate space.
         """
-        x_off = tile_x or 0
-        y_off = tile_y or 0
+        x_off = tile_x if tile_x is not None else 0
+        y_off = tile_y if tile_y is not None else 0
 
         # ── Project bounding box to normalised full-image coordinates ────────
         bbox_norm = ImageSlicer.project_bbox(

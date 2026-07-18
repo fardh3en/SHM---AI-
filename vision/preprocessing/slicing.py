@@ -1,8 +1,9 @@
 """
 Image slicing (sliding window tiling) and coordinate projection service.
 """
+from collections.abc import Generator
 from dataclasses import dataclass
-from typing import Generator
+
 import numpy as np
 
 

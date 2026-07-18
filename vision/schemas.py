@@ -2,6 +2,7 @@
 Standardised Pydantic schemas for the Computer Vision Engine.
 """
 from typing import Any
+
 from pydantic import BaseModel, Field
 
 from backend.app.models.detection import DefectType
@@ -103,5 +104,8 @@ class DetectionResult(BaseModel):
     # Segmentation mask stored as a polygon (list of [x, y] coordinates)
     mask_polygon: dict[str, Any] | None = Field(
         default=None, 
-        description="GeoJSON-style polygon format: {'type': 'Polygon', 'coordinates': [[x, y], ...]}."
+        description=(
+            "GeoJSON-style polygon format: "
+            "{'type': 'Polygon', 'coordinates': [[x, y], ...]}."
+        )
     )

@@ -5,6 +5,8 @@ Detection records store segmentation masks as lightweight polygon coordinate
 lists (rather than full raster masks) to keep database rows small. This module
 converts a binary mask into that storage format using contour extraction.
 """
+from typing import Any
+
 import cv2
 import numpy as np
 
@@ -18,7 +20,7 @@ class MaskPolygonConverter:
     def mask_to_polygon(
         mask: np.ndarray,
         simplify_tolerance: float = 1.5,
-    ) -> dict | None:
+    ) -> dict[str, Any] | None:
         """
         Extract the outer contour of a binary mask and return it as a polygon.
 

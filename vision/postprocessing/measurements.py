@@ -39,8 +39,9 @@ class MeasurementService:
         Returns:
             MeasurementResult Pydantic schema containing pixel and mm dimensions.
         """
-        # Ensure standard binary uint8 format
-        mask = (binary_mask > 127).astype(np.uint8) * 255
+        # Normalise to standard uint8 {0, 255}. Accept both {0, 1} (from
+        # project_mask) and {0, 255} (from cv2) — use > 0 rather than > 127.
+        mask = (binary_mask > 0).astype(np.uint8) * 255
         
         # ── Area Calculation ──────────────────────────────────────────────────
         area_px = float(np.count_nonzero(mask))
@@ -51,8 +52,8 @@ class MeasurementService:
         max_width_px = None
         orientation_deg = None
 
-        if skeleton_mask is not None and np.any(skeleton_mask > 127):
-            skel = (skeleton_mask > 127).astype(np.uint8) * 255
+        if skeleton_mask is not None and np.any(skeleton_mask > 0):
+            skel = (skeleton_mask > 0).astype(np.uint8) * 255
             
             # ── Length Calculation (precision step weighting) ────────────────
             length_px = self._calculate_skeleton_length(skel)

@@ -3,6 +3,7 @@ Image loading and standardisation service.
 """
 import logging
 from pathlib import Path
+
 import cv2
 import numpy as np
 
@@ -41,11 +42,15 @@ class ImageLoader:
         if img_bgr is None:
             raise ValueError(
                 f"File at {path} could not be decoded as an image. "
-                "Verify that the file is not corrupted and is in a supported format (PNG, JPG, BMP)."
+                "Verify that the file is not corrupted and is in a supported format "
+                "(PNG, JPG, BMP)."
             )
 
         # Standardise from BGR (OpenCV default) to RGB (deep learning default)
         img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
         
-        logger.info(f"Loaded image {path.name} | Dimensions: {img_rgb.shape[1]}x{img_rgb.shape[0]} px")
+        logger.info(
+            f"Loaded image {path.name} | "
+            f"Dimensions: {img_rgb.shape[1]}x{img_rgb.shape[0]} px"
+        )
         return img_rgb

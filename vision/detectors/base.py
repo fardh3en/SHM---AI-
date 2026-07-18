@@ -2,7 +2,7 @@
 Abstract interface and data classes for AI model detection engines.
 """
 from abc import ABC, abstractmethod
-from typing import Any
+
 import numpy as np
 from pydantic import BaseModel, Field
 
@@ -40,7 +40,9 @@ class IDetector(ABC):
     """
 
     @abstractmethod
-    def predict(self, image: np.ndarray, confidence_threshold: float | None = None) -> list[RawDetection]:
+    def predict(
+        self, image: np.ndarray, confidence_threshold: float | None = None
+    ) -> list[RawDetection]:
         """
         Perform model forward pass on the input image.
 

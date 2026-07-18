@@ -6,6 +6,7 @@ is deferred to Phase 3 (Structural Health Intelligence).
 """
 from abc import ABC, abstractmethod
 from typing import Any
+
 import numpy as np
 
 try:
@@ -53,23 +54,23 @@ class PlaceholderGraphBuilder(ICrackGraphBuilder):
         """
         Build a placeholder graph containing the coordinates of non-zero pixels.
         """
-        G = nx.Graph()
+        graph = nx.Graph()
 
         # Find skeleton pixels
         pixels = np.argwhere(skeleton_mask > 0)
         
         if len(pixels) == 0:
-            return G
+            return graph
 
         # Just add endpoints (first and last pixel of skeleton) as a placeholder node representation
         start_node = tuple(pixels[0])
         end_node = tuple(pixels[-1])
 
-        G.add_node(start_node, type="endpoint")
-        G.add_node(end_node, type="endpoint")
+        graph.add_node(start_node, type="endpoint")
+        graph.add_node(end_node, type="endpoint")
         
         # Connect them with a placeholder edge
         # Path is simply the start and end coordinates
-        G.add_edge(start_node, end_node, path=[start_node, end_node])
+        graph.add_edge(start_node, end_node, path=[start_node, end_node])
 
-        return G
+        return graph

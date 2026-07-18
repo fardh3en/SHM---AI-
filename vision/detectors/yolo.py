@@ -3,11 +3,13 @@ Ultralytics YOLO11 implementation of the IDetector interface.
 """
 import logging
 from pathlib import Path
+from typing import Any, cast
+
 import numpy as np
 
 try:
     import torch
-    from ultralytics import YOLO
+    from ultralytics import YOLO  # type: ignore[attr-defined]
     _ULTRALYTICS_AVAILABLE = True
 except ImportError:
     _ULTRALYTICS_AVAILABLE = False
@@ -89,7 +91,9 @@ class YOLO11Detector(IDetector):
     def device(self) -> str:
         return self._device
 
-    def predict(self, image: np.ndarray, confidence_threshold: float | None = None) -> list[RawDetection]:
+    def predict(
+        self, image: np.ndarray, confidence_threshold: float | None = None
+    ) -> list[RawDetection]:
         """
         Run YOLO11 instance segmentation on an RGB image.
         """
@@ -99,7 +103,7 @@ class YOLO11Detector(IDetector):
         if len(image.shape) != 3 or image.shape[2] != 3:
             raise ValueError(f"Input image must be RGB with shape [H, W, 3], got {image.shape}")
 
-        results = self._model.predict(
+        raw_results = self._model.predict(
             source=image,
             conf=conf,
             iou=self._default_iou,
@@ -107,10 +111,11 @@ class YOLO11Detector(IDetector):
             verbose=False,
         )
 
-        if not results:
+        if not raw_results:
             return []
 
-        result = results[0]  # Single image inference
+        results_list = cast("list[Any]", raw_results)
+        result = results_list[0]  # Single image inference
         detections: list[RawDetection] = []
 
         # Ensure bounding boxes are present
@@ -143,7 +148,7 @@ class YOLO11Detector(IDetector):
                 
                 if h_mask != h_img or w_mask != w_img:
                     # Resize mask to original size using PyTorch interpolate
-                    import torch.nn.functional as F
+                    import torch.nn.functional as F  # noqa: N812
                     # Reshape to [1, 1, H, W] for interpolation
                     mask_resized = F.interpolate(
                         mask_tensor.unsqueeze(0).unsqueeze(0),
