@@ -1,142 +1,216 @@
-# SHM-AI Platform
+# SHM-AI
 
-> **AI-Directed Predictive Maintenance & Structural Health Monitoring**
+<div align="center">
 
-SHM-AI is a modular, production-oriented platform that combines **computer vision**, **structural engineering intelligence**, and **deterministic material degradation modelling** to automate the inspection, assessment, and maintenance planning of civil infrastructure.
+### AI-Directed Predictive Maintenance & Structural Health Monitoring
 
-The platform is designed to evolve from crack detection into a complete engineering decision-support system capable of assisting inspectors, engineers, and infrastructure managers.
+*A modular engineering platform that combines Computer Vision, Structural Engineering Intelligence, and Material Degradation Modelling for automated infrastructure inspection.*
 
----
+![Python](https://img.shields.io/badge/Python-3.11+-blue.svg)
+![FastAPI](https://img.shields.io/badge/FastAPI-Backend-009688.svg)
+![PyTorch](https://img.shields.io/badge/PyTorch-YOLO11-orange.svg)
+![Status](https://img.shields.io/badge/Status-Phase%204%20Complete-success.svg)
+![Version](https://img.shields.io/badge/Version-v0.4.0-blue.svg)
 
-# Features
-
-## ✅ Phase 1 — Backend Foundation
-- FastAPI REST API
-- Async SQLAlchemy ORM
-- SQLite (PostgreSQL-ready)
-- Alembic database migrations
-- Dependency Injection architecture
-- Pydantic v2 validation
-- CRUD endpoints
-- Modular project structure
+</div>
 
 ---
 
-## ✅ Phase 2 — Vision Engine
-- YOLO11 crack detection
-- Crack segmentation
-- Measurement pipeline
-- Detection persistence
-- Vision orchestration service
-- Quality improvements
-- Extensible detector interface
+# Overview
+
+SHM-AI is a modular AI platform for structural inspection and predictive maintenance of civil infrastructure.
+
+The project integrates:
+
+- Computer Vision for crack detection and measurement
+- Structural Health Intelligence for engineering assessment
+- Material Degradation Models for deterioration prediction
+- Future Recommendation Engine for maintenance planning
+
+The architecture is intentionally modular so each engineering discipline remains independent, testable, and extensible.
 
 ---
 
-## ✅ Phase 3 — Structural Health Intelligence
-- Structural Health Score
-- Severity Classification
-- Engineering Rules Engine
-- Risk Assessment Engine
-- Assessment Service orchestration
-- Deterministic engineering logic
-- Strongly typed assessment schemas
+# Current Progress
 
----
-
-## ✅ Phase 4 — Material Degradation
-- Carbonation modelling
-- Corrosion initiation modelling
-- Service-life estimation
-- Maintenance decision engine
-- Deterministic engineering models
-- Configurable engineering parameters
-- Typed degradation schemas
-- Comprehensive unit tests
+| Phase | Status |
+|--------|--------|
+| Backend Foundation | ✅ Complete |
+| Vision Engine | ✅ Complete |
+| Structural Health Intelligence | ✅ Complete |
+| Material Degradation | ✅ Complete |
+| Recommendation Engine | 🔜 Planned |
+| Dashboard | 🔜 Planned |
+| Deployment | 🔜 Planned |
 
 ---
 
 # Architecture
 
 ```
+                           SHM-AI
+
+                 ┌────────────────────┐
+                 │   Image Upload     │
+                 └─────────┬──────────┘
+                           │
+                           ▼
+                ┌─────────────────────┐
+                │ Vision Engine       │
+                │ YOLO11 Detection    │
+                │ Measurements        │
+                └─────────┬───────────┘
+                          │
+                          ▼
+           ┌────────────────────────────┐
+           │ Structural Intelligence    │
+           │ • Health Score             │
+           │ • Severity                 │
+           │ • Engineering Rules        │
+           │ • Risk Assessment          │
+           └───────────┬────────────────┘
+                       │
+                       ▼
+          ┌─────────────────────────────┐
+          │ Material Degradation        │
+          │ • Carbonation               │
+          │ • Corrosion                 │
+          │ • Service Life              │
+          │ • Maintenance Decision      │
+          └───────────┬─────────────────┘
+                      │
+                      ▼
+        ┌──────────────────────────────┐
+        │ Recommendation Engine        │
+        │ (Phase 5)                    │
+        └───────────┬──────────────────┘
+                    │
+                    ▼
+        ┌──────────────────────────────┐
+        │ Dashboard & Reports          │
+        └──────────────────────────────┘
+```
+
+---
+
+# Project Structure
+
+```
 SHM-AI/
-│
-├── backend/               # FastAPI REST API
-│
-├── vision/                # AI crack detection & measurement
-│
-├── intelligence/          # Structural health assessment
-│
-├── degradation/           # Material deterioration modelling
-│
-├── recommendation/        # Maintenance recommendation engine (Phase 5)
-│
-├── frontend/              # Dashboard (Phase 6)
-│
-├── datasets/              # Training datasets
-│
-├── weights/               # YOLO model weights
-│
-├── reports/               # Generated inspection reports
-│
-├── tests/                 # Unit & integration tests
-│
-├── scripts/               # Development utilities
-│
-└── deployment/            # Docker & cloud deployment (Phase 7)
+
+backend/            FastAPI backend
+vision/             AI crack detection
+intelligence/       Structural health assessment
+degradation/        Material deterioration models
+recommendation/     Maintenance planning
+frontend/           Dashboard
+tests/              Unit tests
+deployment/         Production deployment
+datasets/           Training data
+weights/            YOLO weights
+reports/            Generated reports
+scripts/            Development utilities
 ```
 
 ---
 
 # Technology Stack
 
-| Layer | Technology |
-|--------|------------|
-| API | FastAPI + Uvicorn |
-| Database | SQLAlchemy (Async) |
-| Database Engine | SQLite → PostgreSQL |
-| Migrations | Alembic |
-| Validation | Pydantic v2 |
-| Computer Vision | Ultralytics YOLO11 |
-| Deep Learning | PyTorch |
-| Testing | Pytest + pytest-asyncio |
-| Dashboard | Streamlit → React |
+| Category | Technology |
+|-----------|------------|
 | Language | Python 3.11+ |
+| API | FastAPI |
+| ORM | SQLAlchemy Async |
+| Validation | Pydantic v2 |
+| Database | SQLite / PostgreSQL |
+| Migrations | Alembic |
+| AI | Ultralytics YOLO11 |
+| Deep Learning | PyTorch |
+| Testing | Pytest |
+
+---
+
+# Features
+
+## Phase 1 — Backend Foundation
+
+- FastAPI REST API
+- Async SQLAlchemy
+- Alembic migrations
+- Dependency Injection
+- CRUD APIs
+- Modular architecture
+
+---
+
+## Phase 2 — Vision Engine
+
+- YOLO11 crack detection
+- Crack measurements
+- Detection persistence
+- Extensible detector pipeline
+- Vision orchestration
+
+---
+
+## Phase 3 — Structural Health Intelligence
+
+- Structural Health Score
+- Severity Classification
+- Engineering Rules Engine
+- Risk Assessment
+- Assessment orchestration
+
+---
+
+## Phase 4 — Material Degradation
+
+- Carbonation modelling
+- Corrosion initiation
+- Service-life estimation
+- Maintenance decision engine
+- Deterministic engineering models
+- Strongly typed schemas
+- Unit tested implementation
 
 ---
 
 # Quick Start
 
-## Prerequisites
-
-- Python 3.11+
-- Git
-
----
-
-## Installation
+Clone the repository
 
 ```bash
 git clone https://github.com/fardh3en/SHM---AI-.git
-
 cd SHM---AI-
-
-python -m venv .venv
-
-# Windows
-.venv\Scripts\activate
-
-# macOS/Linux
-# source .venv/bin/activate
-
-pip install -e ".[dev]"
-
-copy .env.example .env
 ```
 
----
+Create a virtual environment
 
-## Run Development Server
+```bash
+python -m venv .venv
+```
+
+Activate
+
+Windows
+
+```bash
+.venv\Scripts\activate
+```
+
+Linux/macOS
+
+```bash
+source .venv/bin/activate
+```
+
+Install dependencies
+
+```bash
+pip install -e ".[dev]"
+```
+
+Run the API
 
 ```bash
 python scripts/run_dev.py
@@ -145,12 +219,12 @@ python scripts/run_dev.py
 or
 
 ```bash
-uvicorn backend.app.main:app --reload --port 8000
+uvicorn backend.app.main:app --reload
 ```
 
 ---
 
-## API Documentation
+# API Documentation
 
 Swagger
 
@@ -164,15 +238,11 @@ ReDoc
 http://localhost:8000/api/v1/redoc
 ```
 
-Health Check
-
-```
-http://localhost:8000/api/v1/system/health
-```
-
 ---
 
-## Run Tests
+# Testing
+
+Run all tests
 
 ```bash
 pytest tests/ -v
@@ -180,24 +250,10 @@ pytest tests/ -v
 
 ---
 
-# Development Roadmap
-
-| Phase | Status | Description |
-|--------|--------|-------------|
-| Phase 1 | ✅ Complete | Backend Foundation |
-| Phase 2 | ✅ Complete | Vision Engine |
-| Phase 3 | ✅ Complete | Structural Health Intelligence |
-| Phase 4 | ✅ Complete | Material Degradation |
-| Phase 5 | 🔜 Planned | Recommendation Engine |
-| Phase 6 | 🔜 Planned | Monitoring Dashboard |
-| Phase 7 | 🔜 Planned | Production Deployment |
-
----
-
-# Project Milestones
+# Version History
 
 | Version | Milestone |
-|----------|-----------|
+|-----------|-----------|
 | **v0.1.0** | Backend Foundation |
 | **v0.2.0** | Vision Engine |
 | **v0.3.0** | Structural Health Intelligence |
@@ -205,7 +261,7 @@ pytest tests/ -v
 
 ---
 
-# Roadmap Checklist
+# Roadmap
 
 - [x] Backend Foundation
 - [x] Vision Engine
@@ -213,54 +269,53 @@ pytest tests/ -v
 - [x] Material Degradation
 - [ ] Recommendation Engine
 - [ ] Dashboard
-- [ ] Production Deployment
+- [ ] Deployment
 
 ---
 
-# Design Principles
-
-The project follows several core engineering principles:
+# Engineering Principles
 
 - Modular architecture
 - Deterministic engineering models
-- Strong type safety
-- High testability
+- Type-safe implementation
+- Test-driven development
 - Separation of concerns
 - Extensible AI pipeline
 - Production-oriented codebase
-- Domain-driven package organization
 
 ---
 
-# Project Vision
+# Future Vision
 
-The long-term objective of SHM-AI is to provide an end-to-end intelligent infrastructure inspection platform capable of:
+SHM-AI aims to become an end-to-end platform capable of:
 
 - Detecting structural defects
 - Measuring crack characteristics
 - Assessing structural health
 - Predicting material deterioration
 - Estimating remaining service life
-- Generating maintenance recommendations
-- Producing engineering reports
-- Supporting large-scale infrastructure asset management
+- Recommending maintenance actions
+- Generating engineering reports
+- Supporting infrastructure asset management
 
 ---
 
-# Legacy Reference
+# Legacy
 
-SHM-AI supersedes the legacy **WhatTheCrack** desktop application.
+SHM-AI supersedes the earlier **WhatTheCrack** desktop application.
 
-Several concepts—including crack topology, skeletonization, and measurement workflows—have been redesigned and reimplemented using a modern, modular architecture suitable for production deployment.
+Core ideas such as crack topology and measurement workflows have been redesigned using a modular, production-ready architecture.
 
 ---
 
-## Author
+# Author
 
 **Fardheen Ahammed**
 
 B.Tech Computer Science & Engineering
 
-Building AI-driven solutions for structural health monitoring and predictive maintenance.
+*"Building AI-driven engineering systems for structural health monitoring."*
 
 ---
+
+⭐ If you found this project interesting, consider starring the repository.
