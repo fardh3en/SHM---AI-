@@ -1,7 +1,20 @@
 """
 Health scoring components.
 
-Will contain concrete IHealthScorer and ISeverityClassifier implementations.
-Empty pending approval of this foundation — see intelligence/interfaces.py
-for the contracts these implementations must satisfy.
+Concrete IHealthScorer implementation lives here. ISeverityClassifier
+implementations are a later milestone.
 """
+from intelligence.scoring.health_scorer import (
+    DEFAULT_SCORING_RULES,
+    DefectScoringRule,
+    HealthScorer,
+    HealthScorerConfig,
+)
+
+__all__ = [
+    "HealthScorer",
+    "HealthScorerConfig",
+    "DefectScoringRule",
+    "DEFAULT_SCORING_RULES",
+]
+
