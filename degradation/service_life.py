@@ -23,8 +23,10 @@ This module is an orchestrator only.  It deliberately does NOT:
   - Import from backend.app.models (ORM decoupling).
   - Persist results (backend layer).
 
-NOTE: all thresholds used in maintenance flag metadata come from
-MaintenanceThreshold in degradation/config.py and are configurable.
+NOTE: maintenance thresholds come from MaintenanceThreshold in
+degradation/config.py and are configurable. The authoritative maintenance
+decision is exposed as DegradationAssessmentReport.requires_maintenance;
+metadata["maintenance_flags"] is kept for backward compatibility only.
 """
 from __future__ import annotations
 
@@ -42,7 +44,7 @@ from degradation.schemas import (
     DegradationAssessmentReport,
     InitiationStatus,
     MaintenanceDecision,
-)
+)  # noqa: TCH001
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -142,7 +144,9 @@ class ServiceLifeEstimator:
         maintenance_decision = self._evaluate_maintenance(
             assessment_input, carbonation, corrosion
         )
-        metadata = self._build_metadata(assessment_input)
+        metadata = self._build_metadata(
+            assessment_input, carbonation, corrosion, maintenance_decision
+        )
 
         return DegradationAssessmentReport(
             asset_id=assessment_input.asset_id,
@@ -150,6 +154,7 @@ class ServiceLifeEstimator:
             carbonation=carbonation,
             corrosion=corrosion,
             maintenance_decision=maintenance_decision,
+            requires_maintenance=maintenance_decision.maintenance_required,
             metadata=metadata,
         )
 
@@ -165,9 +170,20 @@ class ServiceLifeEstimator:
         Evaluate degradation projections and observed signals against
         maintenance thresholds to produce a typed MaintenanceDecision.
 
-        Resolves the secondary initiation contradiction by explicitly checking
-        if initiation was triggered via observed severe/critical defects
-        even when carbonation front has not yet reached cover depth.
+        Root-cause fix for silent-suppression bug
+        ------------------------------------------
+        The secondary initiation path (observed SEVERE/CRITICAL severity)
+        always sets years_since_initiation = 0.0, which makes
+        corrosion_probability_now = 0.0 (1 - exp(0) = 0). Reading only the
+        numeric index against a ceiling would therefore silently suppress the
+        maintenance flag for exactly the scenario the secondary signal exists
+        to catch.
+
+        Fix: maintenance is required when corrosion is INITIATED and EITHER
+          (a) the numeric index meets the ceiling, OR
+          (b) years_since_initiation == 0.0 — the categorical confirmation
+              of active corrosion from field observation must override the
+              formula, not be erased by it.
         """
         threshold = self._config.maintenance_threshold
 
@@ -175,18 +191,32 @@ class ServiceLifeEstimator:
             corrosion.corrosion_probability_now
             >= threshold.corrosion_probability_ceiling
         )
+        # Secondary-signal case: initiation confirmed by observed field severity
+        # but carbonation hasn't reached cover yet, so the propagation formula
+        # hasn't had any elapsed time to work with (years_since = 0.0).
+        corrosion_secondary_signal = (
+            corrosion.initiation_status == InitiationStatus.INITIATED
+            and corrosion.years_since_initiation == 0.0
+        )
         carbonation_exceeds = (
             carbonation.depth_mm_now
             >= threshold.carbonation_cover_fraction
             * assessment_input.material_properties.concrete_cover_mm
         )
+        # secondary_triggered: INITIATED but carbonation hasn't reached cover
+        # (time_to_depassivation_years is not None means cover is still intact)
         secondary_triggered = (
             corrosion.initiation_status == InitiationStatus.INITIATED
             and carbonation.time_to_depassivation_years is not None
         )
 
         maintenance_required = (
-            corrosion_exceeds or carbonation_exceeds or secondary_triggered
+            (
+                corrosion.initiation_status == InitiationStatus.INITIATED
+                and (corrosion_exceeds or corrosion_secondary_signal)
+            )
+            or carbonation_exceeds
+            or secondary_triggered
         )
 
         return MaintenanceDecision(
@@ -199,12 +229,17 @@ class ServiceLifeEstimator:
     def _build_metadata(
         self,
         assessment_input: DegradationAssessmentInput,
+        carbonation: CarbonationProjection,
+        corrosion: CorrosionProjection,
+        maintenance_decision: MaintenanceDecision,
     ) -> dict[str, Any]:
         """
-        Assemble minimal, deterministic report metadata.
+        Assemble report metadata for traceability and backward compatibility.
 
-        Includes engine versions (best-effort) and assessment timestamp.
-        Structured decision data lives in report.maintenance_decision.
+        IMPORTANT: metadata["maintenance_flags"] is retained for backward
+        compatibility with callers that read it, but it is NOT authoritative.
+        Use report.requires_maintenance for the actual maintenance decision.
+        The structured breakdown is at report.maintenance_decision.
         """
         meta: dict[str, Any] = {
             "service": "ServiceLifeEstimator",
@@ -212,6 +247,21 @@ class ServiceLifeEstimator:
             "assessed_at_utc": datetime.datetime.now(datetime.UTC).isoformat(),
             "asset_age_years": assessment_input.asset_age_years,
             "exposure_class": assessment_input.exposure_class,
+            # Non-authoritative backward-compat snapshot of the maintenance
+            # flags. Mirrors maintenance_decision fields; not the source of
+            # truth — use report.requires_maintenance instead.
+            "maintenance_flags": {
+                "corrosion_index_exceeds_ceiling": (
+                    maintenance_decision.corrosion_index_exceeds_ceiling
+                ),
+                "carbonation_exceeds_cover_fraction": (
+                    maintenance_decision.carbonation_exceeds_cover_fraction
+                ),
+                "secondary_initiation_triggered": (
+                    maintenance_decision.secondary_initiation_triggered
+                ),
+                "requires_maintenance": maintenance_decision.maintenance_required,
+            },
         }
 
         if self._config.include_engine_versions:

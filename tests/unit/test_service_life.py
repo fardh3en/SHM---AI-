@@ -349,6 +349,7 @@ class TestIntegration:
         assert result.corrosion.initiation_status == InitiationStatus.NOT_INITIATED
         assert result.corrosion.corrosion_probability_now == 0.0
         assert result.maintenance_decision.maintenance_required is False
+        assert result.requires_maintenance is False
 
     def test_young_asset_not_initiated(self, estimator: ServiceLifeEstimator) -> None:
         """5-year-old asset with 60 mm cover: carbonation hasn't reached cover."""
@@ -357,6 +358,7 @@ class TestIntegration:
         assert result.carbonation.time_to_depassivation_years is not None
         assert result.carbonation.time_to_depassivation_years > 0.0
         assert result.maintenance_decision.maintenance_required is False
+        assert result.requires_maintenance is False
 
     def test_old_thin_cover_asset_initiated(self, estimator: ServiceLifeEstimator) -> None:
         """
@@ -373,6 +375,7 @@ class TestIntegration:
         assert result.corrosion.initiation_status == InitiationStatus.INITIATED
         assert result.corrosion.corrosion_probability_now > 0.0
         assert result.maintenance_decision.maintenance_required is True
+        assert result.requires_maintenance is True
 
     def test_report_depth_non_negative(self, estimator: ServiceLifeEstimator) -> None:
         for age in (0.0, 1.0, 10.0, 50.0, 100.0):
@@ -409,6 +412,33 @@ class TestIntegration:
         )
         assert r1.corrosion.initiation_status == r2.corrosion.initiation_status
         assert r1.maintenance_decision == r2.maintenance_decision
+        assert r1.requires_maintenance == r2.requires_maintenance
+
+    def test_severity_fallback_triggers_requires_maintenance(
+        self, estimator: ServiceLifeEstimator
+    ) -> None:
+        """
+        Young asset (carbonation has NOT reached cover) but inspector observed
+        CRITICAL corrosion severity. The secondary signal must still result in
+        requires_maintenance=True, even though the numeric corrosion index is
+        0.0 at the moment of initiation. This is the exact scenario the
+        severity fallback exists to catch — regression test for the bug where
+        requires_maintenance silently read False here.
+        """
+        result = estimator.assess(
+            _input(age_years=5.0, cover_mm=60.0, observed_severity=SeverityLevel.CRITICAL)
+        )
+        assert result.corrosion.initiation_status == InitiationStatus.INITIATED
+        assert result.corrosion.corrosion_probability_now == 0.0  # formula is still correct
+        assert result.requires_maintenance is True  # but the DECISION must not be False
+
+    def test_no_severity_no_carbonation_no_maintenance_required(
+        self, estimator: ServiceLifeEstimator
+    ) -> None:
+        """Young asset, no observed severity, carbonation nowhere near cover:
+        requires_maintenance must be False."""
+        result = estimator.assess(_input(age_years=5.0, cover_mm=60.0))
+        assert result.requires_maintenance is False
 
 
 # ---------------------------------------------------------------------------

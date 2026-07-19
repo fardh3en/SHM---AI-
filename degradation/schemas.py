@@ -191,10 +191,25 @@ class DegradationAssessmentReport(BaseModel):
     asset assessment.
 
     Assembled by ServiceLifeEstimator from the outputs of CarbonationModel
-    and CorrosionModel. Contains deterministic physics-model projections
-    and a typed maintenance decision. Maintenance recommendation orchestration
-    (e.g., intervention actions and scheduling) remains the responsibility
-    of Phase 5.
+    and CorrosionModel. Contains deterministic physics-model projections,
+    a typed maintenance decision, and a top-level requires_maintenance flag.
+    Maintenance recommendation orchestration (e.g., intervention actions and
+    scheduling) remains the responsibility of Phase 5.
+
+    Key fields
+    ----------
+    requires_maintenance : bool
+        Authoritative single-boolean maintenance flag. True if any threshold
+        is exceeded OR if corrosion initiation was confirmed by observed
+        severe/critical field severity (secondary initiation signal), even
+        when the numeric corrosion index is still 0.0.  Use this field —
+        not metadata["maintenance_flags"] — for decision-making.
+    maintenance_decision : MaintenanceDecision
+        Typed breakdown of which specific condition triggered maintenance.
+    metadata : dict
+        Non-authoritative supplementary context (engine versions, timestamps,
+        raw threshold values). Kept for backward compatibility; NOT the source
+        of truth for the maintenance decision.
     """
 
     asset_id: str
@@ -202,11 +217,21 @@ class DegradationAssessmentReport(BaseModel):
     carbonation: CarbonationProjection
     corrosion: CorrosionProjection
     maintenance_decision: MaintenanceDecision
+    requires_maintenance: bool = Field(
+        description=(
+            "Authoritative maintenance flag. True if any threshold is exceeded "
+            "or if corrosion initiation was confirmed by observed severe/critical "
+            "field severity (secondary signal), even when the numeric corrosion "
+            "index is still 0.0. Prefer this field over metadata['maintenance_flags'] "
+            "for structural decision-making."
+        ),
+    )
     metadata: dict[str, Any] = Field(
         default_factory=dict,
         description=(
-            "Free-form supplementary data about the assessment run "
-            "(e.g. engine versions, assessment timestamp). "
-            "Not intended for structural decision-making itself."
+            "Non-authoritative supplementary context for the assessment run "
+            "(e.g. engine versions, assessment timestamp, raw threshold values). "
+            "Kept for backward compatibility. NOT the source of truth for the "
+            "maintenance decision — use requires_maintenance for that."
         ),
     )
