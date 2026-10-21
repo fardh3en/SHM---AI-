@@ -22,6 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.app.config import Settings, get_settings
 from backend.app.database.session import get_db
 from backend.app.services.asset_service import AssetService
+from backend.app.services.evidence_service import EvidenceService
 from backend.app.services.inspection_service import InspectionService
 
 logger = logging.getLogger(__name__)
@@ -42,28 +43,30 @@ async def get_inspection_service(session: DBSession) -> InspectionService:
     return InspectionService(session)
 
 
+async def get_evidence_service(session: DBSession) -> EvidenceService:
+    """Provide an EvidenceService scoped to the current request."""
+    return EvidenceService(session)
+
+
 # ── CV pipeline (Phase 2) ──────────────────────────────────────────────────────
 @lru_cache(maxsize=1)
 def get_cv_pipeline() -> "CVInferencePipeline":  # noqa: F821 — forward ref, imported lazily below
     """
     Provide a process-wide singleton CVInferencePipeline.
 
-    Cached with lru_cache (not per-request) because loading YOLO weights and
-    moving the model to its compute device is expensive. The first request
-    that triggers vision inference pays this cost; all subsequent requests
-    reuse the same loaded model.
-
-    Import of vision.* modules is deferred to inside this function so that
-    the backend package can be imported (and tests can run) without requiring
-    the optional '.[vision]' dependency group to be installed.
+    Loads the YOLO model into memory once and caches the instance for the
+    lifetime of the process. If weights are not present on disk, instantiation
+    will fail gracefully when first accessed.
     """
-    from vision.detectors.yolo import YOLO11Detector
-    from vision.pipeline.cv_pipeline import CVInferencePipeline
-
     settings = get_settings()
+
+    # Lazy import to avoid loading heavy torch/cv2 libraries until needed
+    from vision.pipeline.cv_pipeline import CVInferencePipeline
+    from vision.detectors.yolo import YOLO11Detector
+
     logger.info(
-        f"Initialising CV pipeline: model={settings.DEFAULT_MODEL_NAME!r} "
-        f"device={settings.INFERENCE_DEVICE!r}"
+        f"Initializing CVInferencePipeline singleton "
+        f"(model={settings.DEFAULT_MODEL_NAME}, device={settings.INFERENCE_DEVICE})"
     )
 
     detector = YOLO11Detector(
@@ -84,4 +87,5 @@ def get_cv_pipeline() -> "CVInferencePipeline":  # noqa: F821 — forward ref, i
 # ── Typed aliases (use these in endpoint signatures) ─────────────────────────
 AssetServiceDep = Annotated[AssetService, Depends(get_asset_service)]
 InspectionServiceDep = Annotated[InspectionService, Depends(get_inspection_service)]
+EvidenceServiceDep = Annotated[EvidenceService, Depends(get_evidence_service)]
 CVPipelineDep = Annotated["CVInferencePipeline", Depends(get_cv_pipeline)]  # noqa: F821

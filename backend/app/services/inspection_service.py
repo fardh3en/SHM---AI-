@@ -9,11 +9,13 @@ Orchestrates inspection lifecycle:
 """
 import logging
 import time
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.app.core.exceptions import InferenceError, ValidationError
+from backend.app.config import get_settings
+from backend.app.core.exceptions import InferenceError, ModelNotFoundError, ValidationError
 from backend.app.models.inspection import Inspection, InspectionStatus
 from backend.app.repositories.asset_repository import AssetRepository
 from backend.app.repositories.detection_repository import DetectionRepository
@@ -65,6 +67,13 @@ class InspectionService(BaseService):
         """Retrieve an inspection by ID. Returns None if not found."""
         return await self._repo.get_by_id(inspection_id)
 
+    async def get_detections(self, inspection_id: str):
+        """Retrieve all defect detection instances for an inspection. Returns None if inspection not found."""
+        insp = await self._repo.get_by_id(inspection_id)
+        if insp is None:
+            return None
+        return await self._detection_repo.get_by_inspection(inspection_id)
+
     async def list_inspections(
         self,
         page: int = 1,
@@ -86,6 +95,10 @@ class InspectionService(BaseService):
     async def list_inspections_for_asset(self, asset_id: str) -> list[Inspection]:
         """Return all inspections for a specific asset (newest first)."""
         return await self._repo.get_by_asset(asset_id)
+
+    async def get_detections_for_inspection(self, inspection_id: str) -> list[Detection]:
+        """Return all Detection records belonging to a given inspection."""
+        return await self._detection_repo.get_by_inspection(inspection_id)
 
     async def update_inspection(
         self, inspection_id: str, data: InspectionUpdate
@@ -116,10 +129,31 @@ class InspectionService(BaseService):
         """Return all PENDING inspections. Used by the job queue in Phase 2."""
         return await self._repo.get_pending()
 
+    @staticmethod
+    def _resolve_input_path(input_path: str) -> Path:
+        """Resolve a stored inspection input_path (web URI or filesystem path) to a disk Path."""
+        settings = get_settings()
+        p = Path(input_path)
+        if p.is_file():
+            return p
+        clean = input_path.strip().lstrip("/")
+        if clean.startswith("uploads/"):
+            sub = clean[len("uploads/"):]
+            candidate = (settings.UPLOAD_DIR / sub).resolve()
+            if candidate.is_file():
+                return candidate
+        candidate2 = (settings.UPLOAD_DIR / clean).resolve()
+        if candidate2.is_file():
+            return candidate2
+        candidate3 = (settings.BASE_DIR / clean).resolve()
+        if candidate3.is_file():
+            return candidate3
+        return p
+
     async def run_inspection(
         self,
         inspection_id: str,
-        pipeline: "IInferencePipeline",
+        pipeline: "IInferencePipeline | None" = None,
     ) -> Inspection | None:
         """
         Execute the computer vision pipeline for an inspection, synchronously.
@@ -140,28 +174,73 @@ class InspectionService(BaseService):
             inspection does not exist.
 
         Raises:
-            ValidationError: If the inspection has no input_path to process,
-                or is already PROCESSING/COMPLETED (re-running is not allowed
-                via this method — callers should create a new inspection).
+            ValidationError: If the inspection has no input_path or invalid status.
+            ModelNotFoundError: If configured vision model weights are missing.
+            InferenceError: If model inference fails.
         """
         inspection = await self._repo.get_by_id(inspection_id)
         if inspection is None:
             logger.warning(f"Run failed — inspection not found: {inspection_id!r}")
             return None
 
+        # ── 1. Validate Evidence ──────────────────────────────────────────────
         if not inspection.input_path:
-            raise ValidationError(
-                f"Inspection '{inspection_id}' has no input_path set; "
-                "nothing to process."
+            msg = (
+                f"Inspection '{inspection_id}' has no photographic evidence attached. "
+                "Upload or select an inspection photograph before running vision inference."
             )
+            logger.warning(f"Run aborted — missing evidence for inspection: {inspection_id!r}")
+            await self._repo.update_fields(
+                inspection,
+                status=InspectionStatus.FAILED,
+                error_message=msg,
+            )
+            raise ValidationError(msg)
+
+        resolved_path = self._resolve_input_path(inspection.input_path)
+        if not resolved_path.is_file():
+            msg = (
+                f"Inspection evidence file '{inspection.input_path}' was not found on the server filesystem. "
+                "Upload a valid image before running vision analysis."
+            )
+            logger.warning(f"Run aborted — evidence file missing on disk: {resolved_path}")
+            await self._repo.update_fields(
+                inspection,
+                status=InspectionStatus.FAILED,
+                error_message=msg,
+            )
+            raise ValidationError(msg)
 
         if inspection.status in (InspectionStatus.PROCESSING, InspectionStatus.COMPLETED):
             raise ValidationError(
                 f"Inspection '{inspection_id}' is already "
-                f"'{inspection.status.value}'. Create a new inspection to re-run."
+                f"'{inspection.status.value}'. Create a new inspection or reset status to re-run."
             )
 
-        # ── Mark as processing ────────────────────────────────────────────────
+        # ── 2. Resolve Pipeline ───────────────────────────────────────────────
+        if pipeline is None:
+            from backend.app.dependencies import get_cv_pipeline
+            try:
+                pipeline = get_cv_pipeline()
+            except (ModelNotFoundError, InferenceError) as exc:
+                logger.error(f"Vision model resolution failed for {inspection_id!r}: {exc}", exc_info=True)
+                await self._repo.update_fields(
+                    inspection,
+                    status=InspectionStatus.FAILED,
+                    error_message=exc.message if hasattr(exc, "message") else str(exc),
+                )
+                raise exc
+            except Exception as exc:
+                logger.exception(f"Unexpected error resolving CV pipeline for {inspection_id!r}")
+                err_msg = f"Failed to initialize vision inference pipeline: {exc}"
+                await self._repo.update_fields(
+                    inspection,
+                    status=InspectionStatus.FAILED,
+                    error_message=err_msg,
+                )
+                raise InferenceError(err_msg) from exc
+
+        # ── 3. Mark as processing ─────────────────────────────────────────────
         inspection = await self._repo.update_fields(
             inspection, status=InspectionStatus.PROCESSING, error_message=None
         )
@@ -170,20 +249,30 @@ class InspectionService(BaseService):
         start_time = time.perf_counter()
 
         try:
-            detection_results = pipeline.run(inspection.input_path)
-        except InferenceError as exc:
+            detection_results = pipeline.run(resolved_path)
+        except (InferenceError, ModelNotFoundError) as exc:
             elapsed_ms = (time.perf_counter() - start_time) * 1000
-            logger.error(f"Inspection processing failed: id={inspection_id!r} error={exc}")
+            err_msg = exc.message if hasattr(exc, "message") else str(exc)
+            logger.error(f"Inspection processing failed: id={inspection_id!r} error={err_msg}", exc_info=True)
             return await self._repo.update_fields(
                 inspection,
                 status=InspectionStatus.FAILED,
-                error_message=str(exc),
+                error_message=err_msg,
+                processing_time_ms=elapsed_ms,
+            )
+        except Exception as exc:  # noqa: BLE001
+            elapsed_ms = (time.perf_counter() - start_time) * 1000
+            logger.exception(f"Unexpected error during inspection processing: id={inspection_id!r}")
+            return await self._repo.update_fields(
+                inspection,
+                status=InspectionStatus.FAILED,
+                error_message=f"Vision pipeline processing error: {exc}",
                 processing_time_ms=elapsed_ms,
             )
 
         elapsed_ms = (time.perf_counter() - start_time) * 1000
 
-        # ── Persist Detection rows ────────────────────────────────────────────
+        # ── 4. Persist Detection rows ─────────────────────────────────────────
         if detection_results:
             records = [
                 {
@@ -207,7 +296,7 @@ class InspectionService(BaseService):
             ]
             await self._detection_repo.bulk_create(records)
 
-        # ── Mark as completed ─────────────────────────────────────────────────
+        # ── 5. Mark as completed ──────────────────────────────────────────────
         updated = await self._repo.update_fields(
             inspection,
             status=InspectionStatus.COMPLETED,

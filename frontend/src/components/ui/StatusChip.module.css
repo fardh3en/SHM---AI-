@@ -1,0 +1,56 @@
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-body);
+  font-weight: 500;
+  border-radius: var(--radius-sm);
+  border: 1px solid;
+  white-space: nowrap;
+}
+
+.sm { padding: 2px 7px; font-size: var(--text-xs); }
+.md { padding: 3px 9px; font-size: var(--text-sm); }
+
+.dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* Status variants */
+.good {
+  color: var(--status-good);
+  background: var(--status-good-bg);
+  border-color: var(--status-good-border);
+}
+.good .dot { background: var(--status-good); }
+
+.warn {
+  color: var(--status-warn);
+  background: var(--status-warn-bg);
+  border-color: var(--status-warn-border);
+}
+.warn .dot { background: var(--status-warn); }
+
+.critical {
+  color: var(--status-critical);
+  background: var(--status-critical-bg);
+  border-color: var(--status-critical-border);
+}
+.critical .dot { background: var(--status-critical); }
+
+.neutral {
+  color: var(--status-neutral);
+  background: var(--status-neutral-bg);
+  border-color: var(--status-neutral-border);
+}
+.neutral .dot { background: var(--status-neutral); }
+
+.info {
+  color: var(--status-info);
+  background: var(--status-info-bg);
+  border-color: var(--status-info-border);
+}
+.info .dot { background: var(--status-info); }

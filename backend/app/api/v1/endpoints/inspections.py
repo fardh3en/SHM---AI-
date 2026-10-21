@@ -7,8 +7,9 @@ the Phase 2 computer vision pipeline via POST /{id}/run.
 from fastapi import APIRouter, HTTPException, Query, status
 
 from backend.app.core.exceptions import SHMBaseException
-from backend.app.dependencies import CVPipelineDep, InspectionServiceDep
+from backend.app.dependencies import InspectionServiceDep
 from backend.app.schemas.common import PaginatedResponse
+from backend.app.schemas.detection import DetectionResponse
 from backend.app.schemas.inspection import InspectionCreate, InspectionResponse, InspectionUpdate
 
 router = APIRouter(prefix="/inspections", tags=["Inspections"])
@@ -146,11 +147,10 @@ async def update_inspection(
 async def run_inspection(
     inspection_id: str,
     service: InspectionServiceDep,
-    pipeline: CVPipelineDep,
 ) -> InspectionResponse:
     """Trigger synchronous vision pipeline execution for an inspection."""
     try:
-        inspection = await service.run_inspection(inspection_id, pipeline)
+        inspection = await service.run_inspection(inspection_id)
     except SHMBaseException as exc:
         raise HTTPException(status_code=exc.http_status, detail=exc.message) from exc
 
@@ -160,3 +160,23 @@ async def run_inspection(
             detail=f"Inspection '{inspection_id}' not found.",
         )
     return InspectionResponse.model_validate(inspection)
+
+@router.get(
+    "/{inspection_id}/detections",
+    response_model=list[DetectionResponse],
+    summary="List defect detections for an inspection",
+    description="Retrieve all defect detection instances recorded for this inspection.",
+    responses={404: {"description": "Inspection not found"}},
+)
+async def get_inspection_detections(
+    inspection_id: str,
+    service: InspectionServiceDep,
+) -> list[DetectionResponse]:
+    """Retrieve all detections belonging to a given inspection."""
+    detections = await service.get_detections(inspection_id)
+    if detections is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Inspection '{inspection_id}' not found.",
+        )
+    return [DetectionResponse.model_validate(d) for d in detections]

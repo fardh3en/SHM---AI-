@@ -1,0 +1,132 @@
+.nav {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-nav);
+  background: var(--bg-base);
+  border-bottom: 1px solid var(--border-subtle);
+  height: var(--nav-height);
+}
+
+.inner {
+  max-width: var(--content-max-width);
+  margin: 0 auto;
+  padding: 0 var(--content-padding);
+  height: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+}
+
+/* Brand */
+.brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  text-decoration: none;
+  flex-shrink: 0;
+}
+
+.brandName {
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 1rem;
+  color: var(--text-primary);
+  letter-spacing: -0.02em;
+}
+
+.brandAccent {
+  color: var(--color-mineral);
+}
+
+/* Nav links */
+.links {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  list-style: none;
+  flex: 1;
+}
+
+.link {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 6px 12px;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--text-muted);
+  border-radius: var(--radius-md);
+  text-decoration: none;
+  transition: color var(--transition-fast), background var(--transition-fast), border-color var(--transition-fast);
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+
+.link:hover {
+  color: var(--text-primary);
+  background: var(--bg-subtle);
+}
+
+.link.active {
+  color: var(--color-mineral);
+  background: var(--bg-mineral-tint);
+  border-color: rgba(216, 198, 90, 0.3);
+}
+
+.soon {
+  color: var(--color-mineral);
+  font-size: 10px;
+  line-height: 1;
+}
+
+/* Right side */
+.right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.statusDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.statusOnline .statusDot  { background: var(--status-good); }
+.statusOffline .statusDot { background: var(--status-critical); }
+.statusConnecting .statusDot { background: var(--color-mineral); }
+
+.statusLabel {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.statusVersion {
+  opacity: 0.6;
+  font-weight: 400;
+}
+
+.homeLink {
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  transition: color var(--transition-fast);
+}
+.homeLink:hover { color: var(--text-primary); }
+
+/* Responsive */
+@media (max-width: 768px) {
+  .inner { padding: 0 var(--space-4); gap: var(--space-4); }
+  .links { display: none; }
+  .right { margin-left: auto; }
+}

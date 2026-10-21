@@ -14,6 +14,7 @@ try:
 except ImportError:
     _ULTRALYTICS_AVAILABLE = False
 
+from backend.app.core.exceptions import ModelNotFoundError
 from backend.app.models.detection import DefectType
 from vision.detectors.base import IDetector, RawDetection
 
@@ -64,6 +65,18 @@ class YOLO11Detector(IDetector):
         self._model_path = Path(model_path)
         self._default_conf = default_conf
         self._default_iou = default_iou
+
+        # ── Verify weights exist locally (prevent unconsented large auto-downloads) ──
+        if not self._model_path.is_file():
+            raise ModelNotFoundError(
+                str(self._model_path),
+                instruction=(
+                    f"Configured YOLO segmentation model weights '{self._model_path.name}' were not found at '{self._model_path}'. "
+                    "Automatic download is disabled to prevent unconsented large file transfers. "
+                    f"To provision the model, run 'python scripts/download_weights.py' or download '{self._model_path.name}' "
+                    f"manually and place it in '{self._model_path.parent}/'."
+                ),
+            )
 
         # ── Hardware Auto-Detection ───────────────────────────────────────────
         if device == "auto":

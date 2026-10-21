@@ -1,0 +1,25 @@
+.page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-base);
+}
+
+/* Skip navigation link */
+.skipLink {
+  position: absolute;
+  top: -100%;
+  left: var(--space-4);
+  background: var(--interactive-primary);
+  color: var(--interactive-primary-text);
+  font-weight: 600;
+  padding: 8px 16px;
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+  text-decoration: none;
+  z-index: var(--z-modal);
+  transition: top var(--transition-fast);
+}
+
+.skipLink:focus {
+  top: 0;
+}

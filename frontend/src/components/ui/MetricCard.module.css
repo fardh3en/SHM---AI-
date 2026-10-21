@@ -1,0 +1,50 @@
+.card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: var(--space-6) var(--space-6) var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Accent bar on left edge */
+.card::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: transparent;
+  border-radius: var(--radius-md) 0 0 var(--radius-md);
+}
+
+.accent-sage::before   { background: var(--color-sage); }
+.accent-lilac::before  { background: var(--color-lilac); }
+.accent-mineral::before { background: var(--color-mineral); }
+
+.label {
+  font-size: var(--text-xs);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+.value {
+  font-family: var(--font-display);
+  font-size: clamp(1.5rem, 4vw, 2.25rem);
+  color: var(--text-primary);
+  line-height: 1;
+  min-height: 1.5em;
+  display: block;
+}
+
+.sub {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  line-height: 1.3;
+}

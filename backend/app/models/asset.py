@@ -16,6 +16,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from backend.app.models.base import Base, TimestampedMixin, UUIDPrimaryKeyMixin
 
 if TYPE_CHECKING:
+    from backend.app.models.asset_evidence import AssetEvidence
     from backend.app.models.degradation_record import DegradationRecord
     from backend.app.models.inspection import Inspection
 
@@ -103,6 +104,13 @@ class Asset(UUIDPrimaryKeyMixin, TimestampedMixin, Base):
         back_populates="asset",
         cascade="all, delete-orphan",
         lazy="select",
+    )
+    evidence: Mapped[list[AssetEvidence]] = relationship(
+        "AssetEvidence",
+        back_populates="asset",
+        cascade="all, delete-orphan",
+        lazy="select",
+        order_by="AssetEvidence.created_at.asc()",
     )
 
     def __repr__(self) -> str:

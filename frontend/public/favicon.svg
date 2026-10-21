@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+  <!-- SHM-AI geometric mark: stylized structural cross-section with crack indicator -->
+  <rect width="32" height="32" rx="4" fill="#403640"/>
+  <!-- Structural beam -->
+  <rect x="4" y="13" width="24" height="6" rx="1" fill="#B6BDA8"/>
+  <!-- Top flange -->
+  <rect x="6" y="10" width="20" height="3" rx="1" fill="#B6BDA8"/>
+  <!-- Bottom flange -->
+  <rect x="6" y="19" width="20" height="3" rx="1" fill="#B6BDA8"/>
+  <!-- Crack indicator (mineral yellow) -->
+  <path d="M14 10 L15.5 13 L14.5 16 L16 19" stroke="#D8C65A" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+  <!-- Health indicator dot (sage) -->
+  <circle cx="26" cy="9" r="3" fill="#B6BDA8"/>
+  <circle cx="26" cy="9" r="1.5" fill="#D8C65A"/>
+</svg>

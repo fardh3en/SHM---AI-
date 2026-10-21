@@ -1,0 +1,364 @@
+/* VisionAnalysisPage.module.css — Dark Industrial Computer Vision Aesthetics */
+
+.container {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+.content {
+  max-width: var(--content-max-width);
+  margin: 0 auto;
+  padding: var(--space-6) var(--content-padding);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  width: 100%;
+}
+
+/* ── Control Bar & Inspection Picker ───────────────────────────────── */
+.controlBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.selectorGroup {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex: 1;
+  min-width: 280px;
+}
+
+.selectorLabel {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.selectInput {
+  flex: 1;
+  max-width: 440px;
+  background: var(--bg-base);
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+  outline: none;
+  cursor: pointer;
+}
+
+.selectInput:focus {
+  border-color: var(--color-mineral);
+}
+
+.headerMetaActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.runButton {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  background: var(--color-plum);
+  color: var(--color-ivory);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.runButton:hover:not(:disabled) {
+  background: var(--color-plum-dark);
+  border-color: var(--color-mineral);
+  color: var(--color-mineral);
+}
+
+.runButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── Inspection Summary Strip ──────────────────────────────────────── */
+.summaryCard {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: var(--space-4) var(--space-5);
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--space-4);
+}
+
+.summaryItem {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.summaryLabel {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.summaryValue {
+  font-family: var(--font-heading);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+/* ── Dual Viewport Grid ────────────────────────────────────────────── */
+.dualViewportGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-5);
+  align-items: start;
+}
+
+.viewportPanel {
+  background: #171715;
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.viewportHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-2-5) var(--space-4);
+  background: rgba(34, 34, 31, 0.9);
+  border-bottom: 1px solid rgba(243, 239, 231, 0.1);
+  color: var(--color-ivory);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+
+.viewportTitle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: 600;
+}
+
+.toggleGroup {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.toggleBtn {
+  background: transparent;
+  border: 1px solid rgba(243, 239, 231, 0.15);
+  color: rgba(243, 239, 231, 0.7);
+  padding: 3px 8px;
+  border-radius: var(--radius-xs);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.toggleBtnActive {
+  background: rgba(216, 198, 90, 0.2);
+  border-color: var(--color-mineral);
+  color: var(--color-mineral);
+}
+
+/* ── Image Display & Overlay Area ──────────────────────────────────── */
+.imageCanvasWrapper {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  background: #0f0f0e;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.displayImage {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+/* Overlay Box Styles */
+.detectionOverlayLayer {
+  position: absolute;
+  inset: 0;
+  pointer-events: auto;
+}
+
+.boundingBox {
+  position: absolute;
+  border: 2px solid #E0564A;
+  background: rgba(224, 86, 74, 0.15);
+  box-shadow: 0 0 8px rgba(224, 86, 74, 0.4);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.boundingBox:hover,
+.boundingBoxActive {
+  border-color: #D8C65A;
+  background: rgba(216, 198, 90, 0.25);
+  box-shadow: 0 0 12px rgba(216, 198, 90, 0.8);
+  z-index: 10;
+}
+
+.boxLabelTag {
+  position: absolute;
+  top: -20px;
+  left: -2px;
+  background: #E0564A;
+  color: #fff;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: 2px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.boundingBox:hover .boxLabelTag,
+.boundingBoxActive .boxLabelTag {
+  background: #D8C65A;
+  color: #171715;
+}
+
+/* ── Defect Inventory Table ────────────────────────────────────────── */
+.tableSection {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.tableHeaderRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.tableTitle {
+  font-family: var(--font-heading);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.tableWrap {
+  overflow-x: auto;
+}
+
+.defectTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-xs);
+  font-family: var(--font-body);
+}
+
+.defectTable th {
+  text-align: left;
+  padding: var(--space-2-5) var(--space-3);
+  background: var(--bg-subtle);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.defectTable td {
+  padding: var(--space-3);
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+}
+
+.defectTableRow {
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.defectTableRow:hover {
+  background: var(--bg-subtle);
+}
+
+.defectTableRowActive {
+  background: rgba(216, 198, 90, 0.12) !important;
+  outline: 1px solid var(--color-mineral);
+}
+
+.confidenceMeter {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-family: var(--font-mono);
+  font-weight: 600;
+}
+
+.meterBar {
+  width: 50px;
+  height: 6px;
+  background: var(--border-medium);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.meterFill {
+  height: 100%;
+  background: var(--color-mineral);
+}
+
+/* ── Notice Callout ────────────────────────────────────────────────── */
+.provenanceNotice {
+  background: var(--bg-subtle);
+  border-left: 3px solid var(--color-mineral);
+  border-radius: var(--radius-sm);
+  padding: var(--space-3) var(--space-4);
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+
+@media (max-width: 1024px) {
+  .dualViewportGrid {
+    grid-template-columns: 1fr;
+  }
+}

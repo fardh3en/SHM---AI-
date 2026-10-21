@@ -48,3 +48,19 @@ class InferenceError(SHMBaseException):
 
     def __init__(self, message: str) -> None:
         super().__init__(message=message, error_code="INFERENCE_ERROR")
+
+
+class ModelNotFoundError(SHMBaseException):
+    """Raised when configured vision model weights are missing from disk."""
+
+    http_status = HTTPStatus.SERVICE_UNAVAILABLE
+
+    def __init__(self, model_path: str, instruction: str | None = None) -> None:
+        inst = instruction or (
+            f"Configured vision model weights not found at '{model_path}'. "
+            "Automatic weight downloads are disabled without explicit consent. "
+            "To provision weights, place the weight file in the 'weights/' directory, "
+            "or run: python scripts/download_weights.py"
+        )
+        super().__init__(message=inst, error_code="MODEL_WEIGHTS_MISSING")
+        self.model_path = model_path

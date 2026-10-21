@@ -1,0 +1,17 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4) 0;
+}
+
+.row {
+  display: flex;
+  gap: var(--space-4);
+  align-items: center;
+}
+
+.cell {
+  height: 14px;
+  display: block;
+}

@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>SHM-AI Structural Inspection Report — {{ asset_id }}</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 2cm 2.2cm;
+            @bottom-center {
+                content: "SHM-AI Structural Inspection Report  |  Page " counter(page) " of " counter(pages);
+                font-family: Arial, Helvetica, sans-serif;
+                font-size: 8pt;
+                color: #6c757d;
+            }
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 10pt;
+            color: #212529;
+            line-height: 1.5;
+            margin: 0;
+            padding: 0;
+        }
+
+        /* ── Header ─────────────────────────────────────────────── */
+        .report-header {
+            background-color: #1e3a5f;
+            color: #ffffff;
+            padding: 18px 22px 14px 22px;
+            margin-bottom: 18px;
+        }
+
+        .report-header h1 {
+            font-size: 18pt;
+            margin: 0 0 3px 0;
+            font-weight: bold;
+            letter-spacing: 0.3px;
+        }
+
+        .report-header .subtitle {
+            font-size: 9pt;
+            color: #adb5bd;
+            margin: 0 0 12px 0;
+        }
+
+        .report-header .meta-row {
+            font-size: 8.5pt;
+            color: #ced4da;
+            border-top: 1px solid #2c5282;
+            padding-top: 8px;
+        }
+
+        .report-header .meta-item {
+            display: inline;
+            margin-right: 20px;
+        }
+
+        /* ── Sections ────────────────────────────────────────────── */
+        .section {
+            margin-bottom: 16px;
+            page-break-inside: avoid;
+        }
+
+        .section-title {
+            font-size: 11pt;
+            font-weight: bold;
+            color: #1e3a5f;
+            border-bottom: 2px solid #1e3a5f;
+            padding-bottom: 3px;
+            margin-bottom: 8px;
+        }
+
+        .section-body {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 3px;
+            padding: 10px 14px;
+        }
+
+        /* ── Health score ────────────────────────────────────────── */
+        .health-score-label {
+            font-size: 8.5pt;
+            color: #6c757d;
+            display: block;
+            margin-bottom: 4px;
+        }
+
+        .health-score {
+            font-size: 30pt;
+            font-weight: bold;
+            color: #1e3a5f;
+            line-height: 1;
+        }
+
+        .health-score-unit {
+            font-size: 10pt;
+            color: #6c757d;
+            vertical-align: super;
+        }
+
+        /* ── Badges ──────────────────────────────────────────────── */
+        .risk-badge {
+            display: inline-block;
+            padding: 3px 12px;
+            border-radius: 10px;
+            font-size: 10pt;
+            font-weight: bold;
+            color: #ffffff;
+            letter-spacing: 0.5px;
+            vertical-align: middle;
+            margin-left: 10px;
+        }
+
+        .action-badge {
+            display: inline-block;
+            padding: 5px 16px;
+            border-radius: 3px;
+            font-size: 11pt;
+            font-weight: bold;
+            color: #ffffff;
+            letter-spacing: 0.5px;
+            margin-bottom: 10px;
+        }
+
+        /* ── Info rows ───────────────────────────────────────────── */
+        .info-row {
+            margin-bottom: 4px;
+        }
+
+        .info-label {
+            font-weight: bold;
+            color: #495057;
+            display: inline-block;
+            min-width: 200px;
+        }
+
+        .info-value {
+            color: #212529;
+        }
+
+        /* ── Tables ──────────────────────────────────────────────── */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 9pt;
+        }
+
+        th {
+            background-color: #1e3a5f;
+            color: #ffffff;
+            padding: 6px 10px;
+            text-align: left;
+            font-weight: bold;
+        }
+
+        td {
+            padding: 5px 10px;
+            border-bottom: 1px solid #dee2e6;
+            vertical-align: top;
+        }
+
+        tr:nth-child(even) td {
+            background-color: #eef2f7;
+        }
+
+        /* ── Escalation trace ────────────────────────────────────── */
+        .trace-block {
+            margin-top: 10px;
+            border-top: 1px solid #dee2e6;
+            padding-top: 8px;
+        }
+
+        .trace-applied {
+            color: #e74c3c;
+            font-weight: bold;
+        }
+
+        .trace-not-applied {
+            color: #6c757d;
+        }
+
+        /* ── Cost ────────────────────────────────────────────────── */
+        .cost-range {
+            font-size: 15pt;
+            font-weight: bold;
+            color: #1e3a5f;
+        }
+
+        .cost-disclaimer {
+            font-size: 8pt;
+            color: #6c757d;
+            margin-bottom: 6px;
+        }
+
+        .cost-basis {
+            font-size: 9pt;
+            color: #495057;
+            margin-top: 6px;
+        }
+
+        /* ── Maintenance flag ────────────────────────────────────── */
+        .flag-yes {
+            font-weight: bold;
+            color: #e74c3c;
+        }
+
+        .flag-no {
+            font-weight: bold;
+            color: #27ae60;
+        }
+
+        /* ── Placeholder ─────────────────────────────────────────── */
+        .placeholder {
+            border: 2px dashed #adb5bd;
+            border-radius: 3px;
+            padding: 18px;
+            text-align: center;
+            color: #6c757d;
+            background-color: #f8f9fa;
+        }
+
+        .placeholder-title {
+            font-size: 10pt;
+            font-weight: bold;
+            color: #6c757d;
+            margin-bottom: 4px;
+        }
+
+        .placeholder-note {
+            font-size: 8.5pt;
+            font-style: italic;
+        }
+
+        /* ── Footer ──────────────────────────────────────────────── */
+        .report-footer {
+            margin-top: 20px;
+            border-top: 1px solid #dee2e6;
+            padding-top: 8px;
+            font-size: 8pt;
+            color: #6c757d;
+            line-height: 1.4;
+        }
+    </style>
+</head>
+<body>
+
+<!-- ══════════════════════════ HEADER ══════════════════════════ -->
+<div class="report-header">
+    <h1>SHM-AI Structural Inspection Report</h1>
+    <p class="subtitle">AI-Directed Predictive Maintenance &amp; Structural Health Monitoring Platform</p>
+    <div class="meta-row">
+        <span class="meta-item"><strong>Asset ID:</strong> {{ asset_id }}</span>
+        <span class="meta-item"><strong>Inspection ID:</strong> {{ inspection_id }}</span>
+        <span class="meta-item"><strong>Asset Type:</strong> {{ asset_type | upper }}</span>
+        <span class="meta-item"><strong>Generated:</strong> {{ generated_at_utc }}</span>
+    </div>
+</div>
+
+<!-- ══════════════════════════ HEALTH ASSESSMENT ══════════════════════════ -->
+<div class="section">
+    <div class="section-title">Health Assessment</div>
+    <div class="section-body">
+        <span class="health-score-label">Composite Structural Health Score&nbsp;(0 = critical deterioration &nbsp;|&nbsp; 100 = pristine)</span>
+        <span class="health-score">{{ health_score_formatted }}</span>
+        <span class="health-score-unit"> / 100</span>
+        <span class="risk-badge" style="background-color: {{ risk_level_color }};">{{ risk_level | upper }}</span>
+    </div>
+</div>
+
+<!-- ══════════════════════════ DEFECT SEVERITY BREAKDOWN ══════════════════════════ -->
+<div class="section">
+    <div class="section-title">Defect Severity Breakdown</div>
+    {% if severity_breakdown %}
+    <table>
+        <thead>
+            <tr>
+                <th>Defect Category</th>
+                <th>Severity</th>
+                <th style="text-align: center;">Observations</th>
+                <th style="text-align: right;">Total Area (mm²)</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in severity_breakdown %}
+            <tr>
+                <td>{{ row.category | replace("_", " ") | title }}</td>
+                <td>{{ row.severity | upper }}</td>
+                <td style="text-align: center;">{{ row.observation_count }}</td>
+                <td style="text-align: right;">{% if row.area_formatted %}{{ row.area_formatted }}{% else %}—{% endif %}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="section-body">No defect observations recorded for this inspection.</div>
+    {% endif %}
+</div>
+
+<!-- ══════════════════════════ FAILURE MODES ══════════════════════════ -->
+<div class="section">
+    <div class="section-title">Identified Structural Failure Modes</div>
+    {% if failure_modes %}
+    <table>
+        <thead>
+            <tr>
+                <th>Failure Mode</th>
+                <th style="text-align: center;">Confidence</th>
+                <th>Description</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for mode in failure_modes %}
+            <tr>
+                <td>{{ mode.category | replace("_", " ") | title }}</td>
+                <td style="text-align: center;">{{ mode.confidence_pct }}</td>
+                <td>{{ mode.description }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="section-body">No structural failure modes identified.</div>
+    {% endif %}
+</div>
+
+<!-- ══════════════════════════ MAINTENANCE RECOMMENDATION ══════════════════════════ -->
+<div class="section">
+    <div class="section-title">Maintenance Recommendation</div>
+    <div class="section-body">
+        <div>
+            <span class="action-badge" style="background-color: {{ action_color }};">
+                {{ recommended_action | replace("_", " ") | upper }}
+            </span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">Next inspection in:</span>
+            <span class="info-value">{{ next_inspection_formatted }} years</span>
+        </div>
+
+        <div class="trace-block">
+            <strong>Escalation Audit Trace</strong>
+            <div class="info-row" style="margin-top: 5px;">
+                <span class="info-label">Baseline action (from risk level):</span>
+                <span class="info-value">{{ baseline_action | replace("_", " ") | upper }}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Stage 2 — Degradation escalation:</span>
+                {% if degradation_escalation_applied %}
+                <span class="trace-applied">APPLIED — requires_maintenance flag raised action to REPAIR</span>
+                {% else %}
+                <span class="trace-not-applied">not applied</span>
+                {% endif %}
+            </div>
+            <div class="info-row">
+                <span class="info-label">Stage 3 — Failure-mode escalation:</span>
+                {% if failure_mode_escalation_applied %}
+                <span class="trace-applied">APPLIED — triggering: {{ triggering_failure_modes | join(", ") | replace("_", " ") | upper }}</span>
+                {% else %}
+                <span class="trace-not-applied">not applied</span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ══════════════════════════ ESTIMATED COST ══════════════════════════ -->
+<div class="section">
+    <div class="section-title">Estimated Intervention Cost</div>
+    <div class="section-body">
+        <div class="cost-disclaimer">Indicative range only — requires review by a qualified quantity surveyor before use in procurement or budgeting.</div>
+        <div class="cost-range">{{ cost_currency }}&nbsp;{{ cost_low_formatted }}&nbsp;–&nbsp;{{ cost_high_formatted }}</div>
+        <div class="cost-basis"><strong>Basis:</strong> {{ cost_basis }}</div>
+    </div>
+</div>
+
+<!-- ══════════════════════════ MATERIAL DEGRADATION ══════════════════════════ -->
+<div class="section">
+    <div class="section-title">Material Degradation Assessment (Phase 4)</div>
+    {% if has_degradation %}
+    <div class="section-body">
+        <div class="info-row">
+            <span class="info-label">Carbonation Depth:</span>
+            <span class="info-value">{{ degradation.carbonation_depth_formatted }} mm</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">Time to Depassivation:</span>
+            <span class="info-value">{{ degradation.time_to_depassivation }}</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">Corrosion Initiated:</span>
+            <span class="info-value">{% if degradation.corrosion_initiated %}Yes{% else %}No{% endif %}</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">Corrosion Index (0–1):</span>
+            <span class="info-value">{{ degradation.corrosion_index_formatted }}</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">Maintenance Required:</span>
+            {% if degradation.requires_maintenance %}
+            <span class="flag-yes">YES</span>
+            {% else %}
+            <span class="flag-no">NO</span>
+            {% endif %}
+        </div>
+    </div>
+    {% else %}
+    <div class="placeholder">
+        <div class="placeholder-title">No Phase 4 Degradation Assessment Available</div>
+        <div class="placeholder-note">
+            Run a material degradation assessment (ServiceLifeEstimator) and supply the result
+            as <em>degradation_report</em> on the RecommendationInput to populate this section.
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- ══════════════════════════ PLACEHOLDER — IMAGE GALLERY ══════════════════════════ -->
+<div class="section">
+    <div class="section-title">Defect Image Gallery</div>
+    <div class="placeholder">
+        <div class="placeholder-title">&#9634; Defect Image Gallery — Pending Phase 2 Integration</div>
+        <div class="placeholder-note">
+            Annotated defect images will appear here once image paths are available
+            on the inspection record (requires Phase 2 vision engine integration).
+        </div>
+    </div>
+</div>
+
+<!-- ══════════════════════════ PLACEHOLDER — TREND CHART ══════════════════════════ -->
+<div class="section">
+    <div class="section-title">Health Score Trend</div>
+    <div class="placeholder">
+        <div class="placeholder-title">&#9634; Health Score Trend Chart — Pending Time-Series Data</div>
+        <div class="placeholder-note">
+            This chart will display the health score history across inspections
+            once multi-inspection time-series data is available.
+        </div>
+    </div>
+</div>
+
+<!-- ══════════════════════════ PLACEHOLDER — SIGN-OFF ══════════════════════════ -->
+<div class="section">
+    <div class="section-title">Engineer Sign-Off</div>
+    <div class="placeholder">
+        <div class="placeholder-title">&#9634; Engineer Review &amp; Sign-Off — Pending Workflow Implementation</div>
+        <div class="placeholder-note">
+            A reviewing structural engineer must validate these AI-generated recommendations
+            before any maintenance work is commissioned. Sign-off workflow is a future milestone.
+        </div>
+    </div>
+</div>
+
+<!-- ══════════════════════════ REPORT METADATA ══════════════════════════ -->
+<div class="section">
+    <div class="section-title">Report Metadata</div>
+    <div class="section-body" style="font-size: 8.5pt; color: #495057;">
+        <div class="info-row">
+            <span class="info-label">Service Version:</span>
+            <span class="info-value">{{ service_version }}</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">Report Generator Version:</span>
+            <span class="info-value">{{ generator_version }}</span>
+        </div>
+        {% if engine_versions %}
+        <div class="info-row">
+            <span class="info-label">Engine Versions:</span>
+            <span class="info-value">
+                {%- for name, ver in engine_versions.items() %}{{ name }}: {{ ver }}{% if not loop.last %}; {% endif %}{% endfor -%}
+            </span>
+        </div>
+        {% endif %}
+        <div class="info-row">
+            <span class="info-label">Generated At (UTC):</span>
+            <span class="info-value">{{ generated_at_utc }}</span>
+        </div>
+    </div>
+</div>
+
+<!-- ══════════════════════════ FOOTER ══════════════════════════ -->
+<div class="report-footer">
+    <strong>DISCLAIMER:</strong>
+    This report is produced by an AI-assisted structural health monitoring system.
+    All recommendations, cost estimates, and risk assessments are indicative starting points
+    and must be reviewed and validated by a qualified structural engineer before any maintenance
+    action is commissioned or any budget committed.
+    Cost figures are not derived from real project data and require review by a qualified
+    quantity surveyor.
+    This report does not constitute professional engineering advice.
+</div>
+
+</body>
+</html>

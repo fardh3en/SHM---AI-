@@ -4,6 +4,7 @@ FastAPI application factory.
 Registers routers, middleware, exception handlers, and lifecycle hooks.
 Configures automatic DB initialization in development environments.
 """
+import os
 import logging
 from contextlib import asynccontextmanager
 from collections.abc import AsyncGenerator
@@ -11,6 +12,7 @@ from collections.abc import AsyncGenerator
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from backend.app.api.v1.router import api_router
 from backend.app.config import get_settings
@@ -36,11 +38,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     # Development auto-tables. (In production, use Alembic migrations instead)
     if not settings.is_production:
-        # Ensure the data directory exists for SQLite
-        if "sqlite" in settings.DATABASE_URL:
-            import os
-            os.makedirs(settings.BASE_DIR / "data", exist_ok=True)
-            os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
+        # Ensure data and uploads directories exist
+        os.makedirs(settings.BASE_DIR / "data", exist_ok=True)
+        os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
+        os.makedirs(settings.UPLOAD_DIR / "evidence", exist_ok=True)
         
         await create_db_and_tables()
 
@@ -75,7 +76,6 @@ app.add_middleware(
 @app.exception_handler(SHMBaseException)
 async def shm_exception_handler(request: Request, exc: SHMBaseException) -> JSONResponse:
     """Map domain-specific exceptions to client-friendly JSON responses."""
-    # Find HTTPStatus mapped class attribute, fall back to 400
     status_code = getattr(exc, "http_status", status.HTTP_400_BAD_REQUEST)
     
     logger.error(
@@ -108,6 +108,12 @@ async def generic_exception_handler(request: Request, exc: Exception) -> JSONRes
             "error_code": "INTERNAL_SERVER_ERROR",
         },
     )
+
+
+# ── Static Uploads Mount ──────────────────────────────────────────────────────
+os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
+os.makedirs(settings.UPLOAD_DIR / "evidence", exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=str(settings.UPLOAD_DIR)), name="uploads")
 
 
 # ── Routing ───────────────────────────────────────────────────────────────────
