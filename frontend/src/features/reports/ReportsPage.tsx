@@ -1,4 +1,5 @@
-import { useState, useMemo, useRef } from 'react'
+import { useState, useMemo, useRef, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useAssets } from '../../hooks/useAssets'
 import { useAssetInspections } from '../../hooks/useAssetInspections'
 import { useReportsList, useGenerateReport } from '../../hooks/useReports'
@@ -20,12 +21,23 @@ import {
 import styles from './ReportsPage.module.css'
 
 export default function ReportsPage() {
+  const [searchParams] = useSearchParams()
+  const urlAssetId = searchParams.get('assetId')
+  const urlInspId = searchParams.get('inspectionId')
+
   const { data: assetsData, isLoading: assetsLoading, isError: assetsError } = useAssets(1, 100)
   const assets = useMemo(() => assetsData?.items ?? [], [assetsData])
 
   // Asset selection
   const [selectedAssetId, setSelectedAssetId] = useState<string>('')
-  const effectiveAssetId = selectedAssetId || assets[0]?.id || ''
+
+  useEffect(() => {
+    if (urlAssetId && assets.some((a) => a.id === urlAssetId)) {
+      setSelectedAssetId(urlAssetId)
+    }
+  }, [urlAssetId, assets])
+
+  const effectiveAssetId = selectedAssetId || (urlAssetId && assets.some((a) => a.id === urlAssetId) ? urlAssetId : assets[0]?.id) || ''
 
   const selectedAsset = useMemo(
     () => assets.find((a) => a.id === effectiveAssetId) ?? assets[0] ?? null,
@@ -41,7 +53,14 @@ export default function ReportsPage() {
 
   // Selected completed inspection
   const [selectedInspId, setSelectedInspId] = useState<string>('')
-  const effectiveInspId = selectedInspId || completedInspections[0]?.id || ''
+
+  useEffect(() => {
+    if (urlInspId && completedInspections.some((i) => i.id === urlInspId)) {
+      setSelectedInspId(urlInspId)
+    }
+  }, [urlInspId, completedInspections])
+
+  const effectiveInspId = selectedInspId || (urlInspId && completedInspections.some((i) => i.id === urlInspId) ? urlInspId : completedInspections[0]?.id) || ''
 
   const selectedInspection = useMemo(
     () => completedInspections.find((i) => i.id === effectiveInspId) ?? completedInspections[0] ?? null,

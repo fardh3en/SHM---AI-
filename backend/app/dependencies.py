@@ -24,6 +24,7 @@ from backend.app.database.session import get_db
 from backend.app.services.asset_service import AssetService
 from backend.app.services.evidence_service import EvidenceService
 from backend.app.services.inspection_service import InspectionService
+from backend.app.services.structural_assessment_service import StructuralAssessmentService
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +47,11 @@ async def get_inspection_service(session: DBSession) -> InspectionService:
 async def get_evidence_service(session: DBSession) -> EvidenceService:
     """Provide an EvidenceService scoped to the current request."""
     return EvidenceService(session)
+
+
+async def get_structural_assessment_service(session: DBSession) -> StructuralAssessmentService:
+    """Provide a StructuralAssessmentService scoped to the current request."""
+    return StructuralAssessmentService(session)
 
 
 # ── CV pipeline (Phase 2) ──────────────────────────────────────────────────────
@@ -88,4 +94,5 @@ def get_cv_pipeline() -> "CVInferencePipeline":  # noqa: F821 — forward ref, i
 AssetServiceDep = Annotated[AssetService, Depends(get_asset_service)]
 InspectionServiceDep = Annotated[InspectionService, Depends(get_inspection_service)]
 EvidenceServiceDep = Annotated[EvidenceService, Depends(get_evidence_service)]
+AssessmentServiceDep = Annotated[StructuralAssessmentService, Depends(get_structural_assessment_service)]
 CVPipelineDep = Annotated["CVInferencePipeline", Depends(get_cv_pipeline)]  # noqa: F821

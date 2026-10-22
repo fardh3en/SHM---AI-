@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import type { ModelBuildResult, StructuralComponentData } from './types'
+import type { ModelBuildResult, StructuralComponentData, ComponentStatus } from './types'
 import type { Asset } from '../../../api/assets'
 import type { Inspection } from '../../../api/inspections'
 
@@ -10,8 +10,10 @@ export function buildTunnelModel(
   const group = new THREE.Group()
   const components = new Map<string, StructuralComponentData>()
 
-  const latestInspection = inspections.find((i) => i.defect_count > 0)
-  const hasFindings = Boolean(latestInspection)
+  const completedInspections = inspections.filter((i) => i.status === 'completed')
+  const latestCompleted = completedInspections[0]
+  const inspectionWithFindings = completedInspections.find((i) => i.defect_count > 0)
+  const hasFindings = Boolean(inspectionWithFindings)
 
   const matFindings = new THREE.MeshStandardMaterial({
     color: '#E0564A',
@@ -93,13 +95,14 @@ export function buildTunnelModel(
       segMesh.position.set(0, 0, ringZ)
 
       const isPanel42 = ringNumber === 42 && s === 1
-      const isNominalPanel = ringNumber === 41 || ringNumber === 43
-
-      const segStatus = isPanel42 && hasFindings
-        ? 'assessed_findings'
-        : isNominalPanel
-        ? 'assessed_nominal'
-        : 'not_assessed'
+      let segStatus: ComponentStatus = 'not_assessed'
+      if (isPanel42) {
+        if (hasFindings && inspectionWithFindings) {
+          segStatus = 'assessed_findings'
+        } else if (completedInspections.length > 0) {
+          segStatus = 'assessed_nominal'
+        }
+      }
 
       const segMat = segStatus === 'assessed_findings'
         ? matFindings
@@ -117,12 +120,14 @@ export function buildTunnelModel(
           status: segStatus,
           designFunction: 'Carries circumferential hoop compression and earth/hydrostatic loads',
           dimensions: `Ring Length: 2.2m · Outer Radius: 4.8m · Sector: ${s * 90}°-${(s + 1) * 90}°`,
-          defectSummary: isPanel42 && hasFindings
-            ? `Active inspection findings: ${latestInspection?.notes || 'Transverse crack on segment panel 42. Minor spalling near joint.'}`
+          defectSummary: segStatus === 'assessed_findings' && inspectionWithFindings
+            ? `${inspectionWithFindings.defect_count} structural defect(s) detected during inspection. Notes: ${inspectionWithFindings.notes || 'Anomalies identified.'}`
             : undefined,
-          findingsCount: isPanel42 ? latestInspection?.defect_count : 0,
-          linkedEvidencePaths: isPanel42
-            ? ['/uploads/evidence/lincoln_tunnel_south_tube_interior.jpg', '/uploads/evidence/lincoln_tunnel_lining_segments_1936.jpg']
+          findingsCount: segStatus === 'assessed_findings' ? inspectionWithFindings?.defect_count : 0,
+          inspectionId: segStatus === 'assessed_findings' ? inspectionWithFindings?.id : segStatus === 'assessed_nominal' ? latestCompleted?.id : undefined,
+          inspectionDate: segStatus === 'assessed_findings' ? inspectionWithFindings?.created_at : segStatus === 'assessed_nominal' ? latestCompleted?.created_at : undefined,
+          linkedEvidencePaths: segStatus === 'assessed_findings' && inspectionWithFindings?.input_path
+            ? [inspectionWithFindings.input_path]
             : undefined,
         },
         segMat

@@ -1,5 +1,14 @@
 import { useParams, Link } from 'react-router-dom'
-import { ArrowLeft, MapPin, Activity, FileText, Layers, Box } from 'lucide-react'
+import {
+  ArrowLeft,
+  MapPin,
+  Activity,
+  FileText,
+  Layers,
+  Box,
+  ScanLine,
+  Camera,
+} from 'lucide-react'
 import PageHeader from '../../components/layout/PageHeader'
 import StatusChip from '../../components/ui/StatusChip'
 import LoadingState from '../../components/ui/LoadingState'
@@ -7,6 +16,7 @@ import ErrorState from '../../components/ui/ErrorState'
 import { useAsset } from '../../hooks/useAssets'
 import { useAssetInspections } from '../../hooks/useAssetInspections'
 import AssetEvidenceGallery from './AssetEvidenceGallery'
+import InspectionComparisonCard from './InspectionComparisonCard'
 import styles from './AssetDetailPage.module.css'
 
 function formatDate(iso: string): string {
@@ -225,17 +235,34 @@ export default function AssetDetailPage() {
                   <table className={styles.table}>
                     <thead>
                       <tr>
+                        <th scope="col" className={styles.thumbCell}>Evidence</th>
                         <th scope="col">Date</th>
                         <th scope="col">Source</th>
                         <th scope="col">Status</th>
                         <th scope="col" className={styles.numCol}>Defect Count</th>
                         <th scope="col" className={styles.numCol}>Health Score</th>
+                        <th scope="col">Methodology</th>
                         <th scope="col">Inspector / Pipeline Notes</th>
+                        <th scope="col">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
                       {inspections?.map((insp) => (
                         <tr key={insp.id}>
+                          <td className={styles.thumbCell}>
+                            {insp.input_path ? (
+                              <img
+                                src={insp.input_path}
+                                alt="Evidence thumbnail"
+                                className={styles.evidenceThumb}
+                                loading="lazy"
+                              />
+                            ) : (
+                              <div className={styles.thumbPlaceholder} title="No photographic media">
+                                <Camera size={14} />
+                              </div>
+                            )}
+                          </td>
                           <td style={{ whiteSpace: 'nowrap', fontFamily: 'var(--font-mono)', fontSize: '0.8125rem' }}>
                             {formatDate(insp.created_at)}
                           </td>
@@ -254,7 +281,12 @@ export default function AssetDetailPage() {
                           </td>
                           <td className={styles.numCol}>
                             <span className={styles.scoreCell}>
-                              {insp.health_score !== null ? insp.health_score.toFixed(1) : '—'}
+                              {insp.health_score !== null ? insp.health_score.toFixed(1) : 'Not Assessed'}
+                            </span>
+                          </td>
+                          <td>
+                            <span className={styles.methodTag}>
+                              {insp.health_score !== null ? 'SHM-AI v1.0 (Noisy-OR)' : 'Not Assessed'}
                             </span>
                           </td>
                           <td className={styles.notesCell}>
@@ -265,6 +297,26 @@ export default function AssetDetailPage() {
                               </div>
                             )}
                           </td>
+                          <td>
+                            <div className={styles.actionLinks}>
+                              <Link
+                                to={`/vision?inspectionId=${insp.id}`}
+                                className={styles.actionIconBtn}
+                                title="Open in Vision Analysis"
+                              >
+                                <ScanLine size={12} />
+                                <span>Vision</span>
+                              </Link>
+                              <Link
+                                to={`/reports?assetId=${asset.id}&inspectionId=${insp.id}`}
+                                className={styles.actionIconBtn}
+                                title="Compile Engineering Report"
+                              >
+                                <FileText size={12} />
+                                <span>Report</span>
+                              </Link>
+                            </div>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -274,6 +326,9 @@ export default function AssetDetailPage() {
             </>
           )}
         </section>
+
+        {/* Comparative Structural Change Tracking */}
+        <InspectionComparisonCard assetId={asset.id} inspections={inspections ?? []} />
       </div>
     </div>
   )

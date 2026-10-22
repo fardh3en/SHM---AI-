@@ -2,7 +2,7 @@
 Report API endpoints.
 
 Generates, lists, and serves formal civil engineering structural health reports.
-Integrates RecommendationService and ReportGenerator presentation pipeline.
+Integrates StructuralAssessmentService, RecommendationService, and ReportGenerator.
 """
 import datetime
 import logging
@@ -23,13 +23,16 @@ from backend.app.schemas.report import (
     ReportGenerateResponse,
     ReportSummary,
 )
+from backend.app.services.structural_assessment_service import StructuralAssessmentService
 from intelligence.schemas import (
     AssetType,
     DefectCategory,
     DefectSeverityBreakdown,
+    FailureModeCategory,
     HealthAssessmentReport,
     RiskLevel,
     SeverityLevel,
+    StructuralFailureMode,
 )
 from recommendation.recommendation_service import RecommendationService
 from recommendation.report_generator import ReportGenerator
@@ -89,7 +92,7 @@ async def list_reports(settings: AppSettings) -> list[ReportSummary]:
     summary="Generate a formal structural inspection report",
     description=(
         "Assembles actual asset details, completed inspection telemetry, defect detections, "
-        "and runs the RecommendationEngine to compile a validated engineering report."
+        "and runs the explainable assessment and recommendation engine to compile a validated engineering report."
     ),
     responses={
         404: {"description": "Asset or Inspection not found"},
@@ -134,91 +137,131 @@ async def generate_report(
             detail=f"Inspection is in '{inspection.status.value}' state. Reports require a completed inspection.",
         )
 
-    # 3. Retrieve detections
-    detections = await detection_repo.get_by_inspection(inspection.id)
+    # 3. Retrieve or compute explainable structural assessment
+    assessment_service = StructuralAssessmentService(session)
+    assessment = await assessment_service.assess_inspection(inspection.id)
+    if assessment is None or assessment.health_score is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                f"Inspection '{data.inspection_id}' cannot be assessed: "
+                f"{assessment.notes if assessment else 'No valid assessment data available'}."
+            ),
+        )
 
-    # 4. Map defect breakdown
-    category_counts: dict[str, int] = {}
-    for det in detections:
-        cat_key = det.defect_type.value if hasattr(det.defect_type, "value") else str(det.defect_type)
-        category_counts[cat_key] = category_counts.get(cat_key, 0) + 1
-
+    # 4. Map breakdowns and failure modes from authoritative assessment
     breakdowns: list[DefectSeverityBreakdown] = []
-    for cat_name, count in category_counts.items():
+    for item in assessment.severity_breakdown:
         try:
-            cat_enum = DefectCategory(cat_name)
+            cat_enum = DefectCategory(item.defect_category)
         except ValueError:
             cat_enum = DefectCategory.UNKNOWN
+        try:
+            sev_enum = SeverityLevel(item.severity)
+        except ValueError:
+            sev_enum = SeverityLevel.MODERATE
         breakdowns.append(
             DefectSeverityBreakdown(
                 defect_category=cat_enum,
-                severity=SeverityLevel.MODERATE,
-                observation_count=count,
+                severity=sev_enum,
+                observation_count=item.observation_count,
+                total_area_mm2=item.total_area_mm2,
+                max_width_mm=item.max_width_mm,
             )
         )
 
-    if not breakdowns and inspection.defect_count > 0:
-        breakdowns.append(
-            DefectSeverityBreakdown(
-                defect_category=DefectCategory.CRACK,
-                severity=SeverityLevel.MINOR,
-                observation_count=inspection.defect_count,
+    failure_modes: list[StructuralFailureMode] = []
+    for fm in assessment.failure_modes:
+        try:
+            fcat = FailureModeCategory(fm.category)
+        except ValueError:
+            fcat = FailureModeCategory.UNKNOWN
+        failure_modes.append(
+            StructuralFailureMode(
+                category=fcat,
+                description=fm.description,
+                confidence=fm.confidence,
+                related_defect_categories=[
+                    DefectCategory(d)
+                    for d in fm.related_defects
+                    if d in [e.value for e in DefectCategory]
+                ],
             )
         )
 
-    # 5. Compute health score and risk level
-    health_score = (
-        inspection.health_score
-        if inspection.health_score is not None
-        else (asset.latest_health_score if asset.latest_health_score is not None else 75.0)
-    )
-
-    if health_score >= 80.0:
-        risk = RiskLevel.LOW
-    elif health_score >= 60.0:
-        risk = RiskLevel.MEDIUM
-    elif health_score >= 40.0:
-        risk = RiskLevel.HIGH
-    else:
-        risk = RiskLevel.CRITICAL
-
-    # 6. Build recommendation input and execute decision service
     try:
-        atype = AssetType(asset.asset_type.value)
-    except ValueError:
-        atype = AssetType.OTHER
+        risk_enum = RiskLevel(assessment.risk_level)
+    except (ValueError, TypeError):
+        risk_enum = RiskLevel.LOW
 
     health_report = HealthAssessmentReport(
         asset_id=asset.id,
         inspection_id=inspection.id,
-        health_score=health_score,
-        risk_level=risk,
+        health_score=assessment.health_score,
+        risk_level=risk_enum,
         severity_breakdown=breakdowns,
-        failure_modes=[],
+        failure_modes=failure_modes,
+        metadata={
+            "assessment_method": assessment.assessment_method,
+            "service_version": assessment.service_version,
+            "assessed_at_utc": assessment.assessment_date_utc,
+            "data_sources": assessment.data_sources,
+            "assumptions": assessment.assumptions,
+            "limitations": assessment.limitations,
+            "missing_inputs": assessment.missing_inputs,
+        },
     )
+
+    try:
+        atype = AssetType(asset.asset_type.value)
+    except ValueError:
+        atype = AssetType.OTHER
 
     rec_input = RecommendationInput(
         asset_id=asset.id,
         inspection_id=inspection.id,
         asset_type=atype,
         health_report=health_report,
-        degradation_report=None,
+        degradation_report=None,  # Retired degradation module excluded
     )
 
     rec_service = RecommendationService()
     rec_report = rec_service.assess(rec_input)
 
-    # 7. Render presentation HTML
+    # 5. Retrieve detections & image path for defect gallery
+    detections = await detection_repo.get_by_inspection(inspection.id)
+    det_dicts = [
+        {
+            "defect_type": d.defect_type.value,
+            "confidence": d.confidence,
+            "area_px": f"{d.area_px:,.0f}" if d.area_px is not None else None,
+            "length_px": f"{d.length_px:.1f}" if d.length_px is not None else None,
+            "width_px": f"{d.width_px:.2f}" if d.width_px is not None else None,
+        }
+        for d in detections
+    ]
+
+    # 6. Render presentation HTML
     generator = ReportGenerator()
     generated_at = datetime.datetime.now(datetime.timezone.utc)
     timestamp_str = generated_at.strftime("%Y%m%d_%H%M%S")
     html_content = generator.render_html(
-        rec_input,
-        rec_report,
+        input=rec_input,
+        report=rec_report,
         generated_at_utc=generated_at.strftime("%Y-%m-%d %H:%M:%S UTC"),
+        asset_name=asset.name,
+        input_image_path=inspection.input_path,
+        detections=det_dicts,
+        assessment_meta={
+            "assessment_method": assessment.assessment_method,
+            "data_sources": assessment.data_sources,
+            "assumptions": assessment.assumptions,
+            "limitations": assessment.limitations,
+            "missing_inputs": assessment.missing_inputs,
+        },
     )
 
-    # 8. Persist report file
+    # 7. Persist report file
     report_id = str(uuid.uuid4())
     filename = f"report_{asset.id[:8]}_{inspection.id[:8]}_{timestamp_str}.html"
     settings.REPORTS_DIR.mkdir(parents=True, exist_ok=True)
@@ -241,7 +284,7 @@ async def generate_report(
         asset_id=asset.id,
         asset_name=asset.name,
         inspection_id=inspection.id,
-        health_score=health_score,
+        health_score=assessment.health_score,
         recommended_action=rec_report.decision.recommended_action.value,
         cost_estimate_low=rec_report.cost_estimate.low,
         cost_estimate_high=rec_report.cost_estimate.high,

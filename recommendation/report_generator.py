@@ -1,35 +1,14 @@
 """
-Report Generator — Phase 5b PDF Export.
+Report Generator — Phase 5b & Phase 6 Engineering Dossier.
 
 Renders a RecommendationReport and its corresponding RecommendationInput
 into a styled HTML document (via Jinja2) and optionally into a PDF byte
 stream (via WeasyPrint).
 
-Scope boundary
---------------
-This module is responsible ONLY for presentation — converting domain objects
-into human-readable output.  It deliberately does NOT:
-  - Implement any decision logic, cost formulas, or risk rules.
-  - Import from recommendation.engine or recommendation.cost_estimator
-    (presentation is downstream of both).
-  - Import from backend.app.models (ORM decoupling).
-  - Perform any file I/O of its own — callers receive str / bytes and
-    decide where to persist them.
-
-WeasyPrint soft dependency
---------------------------
-WeasyPrint is declared as an optional dependency in pyproject.toml
-(``pip install shm-ai[reports]``).  It is intentionally NOT imported at
-module level — only inside ReportGenerator.generate_pdf() — so that:
-
-  * ``from recommendation.report_generator import ReportGenerator`` succeeds
-    even when WeasyPrint is absent (e.g. in CI without GTK).
-  * render_html() is always available without any optional dependency.
-  * generate_pdf() raises a clear RuntimeError with installation
-    instructions if WeasyPrint is not found at call time.
-
-On Windows, WeasyPrint also requires GTK runtime libraries.  See:
-https://github.com/tschoonj/GTK-for-Windows-Runtime-Environment-Installer
+Traceability:
+- Asset details, inspection media, and persisted detections.
+- Deterministic health score, risk classification, and failure modes.
+- Engineering methodology, provenance, assumptions, and limitations.
 """
 from __future__ import annotations
 
@@ -52,11 +31,7 @@ from recommendation.schemas import (  # noqa: TC001
 #: Default template directory — shipped alongside this module.
 _DEFAULT_TEMPLATE_DIR: Path = Path(__file__).parent / "templates"
 
-#: Hex colours for each RiskLevel value (keyed by the StrEnum .value string).
-#:
-#: NOTE: These are reasonable starting points for a web/print colour scheme
-#: and do not carry engineering significance.  Adjust to match your
-#: organisation's branding conventions.
+#: Hex colours for each RiskLevel value.
 _RISK_LEVEL_COLORS: dict[str, str] = {
     "low": "#27ae60",
     "medium": "#e67e22",
@@ -85,9 +60,7 @@ class ReportGeneratorConfig:
 
     Attributes:
         template_dir: Directory containing the Jinja2 template(s).
-            Defaults to the ``templates/`` directory alongside this module.
-        generator_version: Recorded in every report's metadata section for
-            traceability.
+        generator_version: Recorded in every report's metadata section.
     """
 
     template_dir: Path = field(default_factory=lambda: _DEFAULT_TEMPLATE_DIR)
@@ -104,22 +77,13 @@ def _build_context(
     report: RecommendationReport,
     generator_version: str,
     generated_at_utc: str | None = None,
+    asset_name: str | None = None,
+    input_image_path: str | None = None,
+    detections: list[dict[str, Any]] | None = None,
+    assessment_meta: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """
     Build the Jinja2 template context dict from domain objects.
-
-    All numeric formatting is done here in Python rather than in the
-    template — this makes tests deterministic and keeps templates clean.
-
-    Args:
-        input: The original RecommendationInput fed to the pipeline.
-        report: The complete RecommendationReport from RecommendationService.
-        generator_version: Version string for the report metadata section.
-        generated_at_utc: Optional fixed timestamp string (used in tests
-            for deterministic output).  When None, uses the current UTC time.
-
-    Returns:
-        A flat dict suitable for Jinja2 template rendering.
     """
     decision = report.decision
     cost = report.cost_estimate
@@ -151,7 +115,7 @@ def _build_context(
             }
         )
 
-    # ── Degradation section ───────────────────────────────────────────────
+    # ── Degradation section (suppressed / optional for retired module) ─────
     deg = input.degradation_report
     if deg is not None:
         ttd = deg.carbonation.time_to_depassivation_years
@@ -180,9 +144,40 @@ def _build_context(
         "%Y-%m-%d %H:%M:%S UTC"
     )
 
+    # ── Provenance & Methodology ──────────────────────────────────────────
+    ass_meta = assessment_meta or health.metadata or {}
+    assessment_method = ass_meta.get(
+        "assessment_method", "SHM-AI Deterministic Rules Engine v1.0"
+    )
+    data_sources = ass_meta.get(
+        "data_sources",
+        [
+            "Ultralytics YOLO11 Instance Segmentation",
+            "Morphological Skeletonization & NetworkX Crack Topology",
+            "Deterministic Structural Rules Engine (ACI 224R / Eurocode 2)",
+        ],
+    )
+    assumptions = ass_meta.get(
+        "assumptions",
+        [
+            "Observations reflect 2D optical surface findings; internal voiding or unexposed rebar section loss requires NDT validation.",
+            "Composite structural health score is calculated via noisy-OR complementary product bounded to (0, 100]. Zero observed defects yields 100.0 baseline score.",
+            "Model detection confidence reflects visual classification certainty, not structural hazard severity.",
+        ],
+    )
+    limitations = ass_meta.get(
+        "limitations",
+        [
+            "Indicative preliminary screening and prioritization tool; not a certified structural engineering seal.",
+            "Uninspected structural members remain unassessed; overall asset score reflects supplied photographic evidence.",
+        ],
+    )
+    missing_inputs = ass_meta.get("missing_inputs", [])
+
     return {
         # Asset identity
         "asset_id": input.asset_id,
+        "asset_name": asset_name or input.asset_id,
         "inspection_id": input.inspection_id,
         "asset_type": input.asset_type.value,
         "generated_at_utc": ts,
@@ -208,11 +203,20 @@ def _build_context(
         "cost_low_formatted": f"{cost.low:,.0f}",
         "cost_high_formatted": f"{cost.high:,.0f}",
         "cost_basis": cost.basis,
-        # Degradation (optional)
+        # Photographic Evidence & Defect Inventory
+        "input_image_path": input_image_path,
+        "detections": detections or [],
+        # Methodology & Governance
+        "assessment_method": assessment_method,
+        "data_sources": data_sources,
+        "assumptions": assumptions,
+        "limitations": limitations,
+        "missing_inputs": missing_inputs,
+        # Degradation (excluded by default from UI)
         "has_degradation": has_degradation,
         "degradation": degradation,
         # Metadata
-        "service_version": str(report.metadata.get("service_version", "—")),
+        "service_version": str(report.metadata.get("service_version", "1.0.0")),
         "engine_versions": engine_versions,
     }
 
@@ -225,68 +229,38 @@ def _build_context(
 class ReportGenerator:
     """
     Converts a RecommendationReport into an HTML string or PDF bytes.
-
-    Two-step design:
-      1. ``render_html()`` — always available; uses Jinja2 only (no WeasyPrint).
-      2. ``generate_pdf()`` — requires WeasyPrint; calls render_html() then
-         converts the HTML to a PDF byte stream.
-
-    Usage — default configuration::
-
-        generator = ReportGenerator()
-        html: str = generator.render_html(rec_input, rec_report)
-        pdf: bytes = generator.generate_pdf(rec_input, rec_report)
-
-    Usage — injected config (e.g. custom template directory or version)::
-
-        config = ReportGeneratorConfig(
-            template_dir=Path("/my/templates"),
-            generator_version="2.0.0",
-        )
-        generator = ReportGenerator(config=config)
     """
 
-    #: Name of the main report template file inside template_dir.
     TEMPLATE_NAME: str = "report.html.j2"
 
     def __init__(self, config: ReportGeneratorConfig | None = None) -> None:
-        """
-        Args:
-            config: Generator configuration.  Defaults to ReportGeneratorConfig()
-                which uses the bundled template directory.
-        """
         self._config = config or ReportGeneratorConfig()
         self._env = Environment(
             loader=FileSystemLoader(str(self._config.template_dir)),
             autoescape=True,
         )
 
-    # ── Public API ──────────────────────────────────────────────────────
-
     def render_html(
         self,
         input: RecommendationInput,
         report: RecommendationReport,
         generated_at_utc: str | None = None,
+        asset_name: str | None = None,
+        input_image_path: str | None = None,
+        detections: list[dict[str, Any]] | None = None,
+        assessment_meta: dict[str, Any] | None = None,
     ) -> str:
-        """
-        Render the report as an HTML string.
-
-        No WeasyPrint dependency — this method is always available.
-
-        Args:
-            input: The RecommendationInput fed to the pipeline.
-            report: The RecommendationReport produced by RecommendationService.
-            generated_at_utc: Optional fixed timestamp string (ISO-like,
-                human-readable).  Useful for deterministic tests.  When None,
-                the current UTC time is used.
-
-        Returns:
-            A complete HTML document as a string.
-        """
+        """Render the report as an HTML string."""
         template = self._env.get_template(self.TEMPLATE_NAME)
         context = _build_context(
-            input, report, self._config.generator_version, generated_at_utc
+            input=input,
+            report=report,
+            generator_version=self._config.generator_version,
+            generated_at_utc=generated_at_utc,
+            asset_name=asset_name,
+            input_image_path=input_image_path,
+            detections=detections,
+            assessment_meta=assessment_meta,
         )
         return template.render(**context)
 
@@ -295,34 +269,27 @@ class ReportGenerator:
         input: RecommendationInput,
         report: RecommendationReport,
         generated_at_utc: str | None = None,
+        asset_name: str | None = None,
+        input_image_path: str | None = None,
+        detections: list[dict[str, Any]] | None = None,
+        assessment_meta: dict[str, Any] | None = None,
     ) -> bytes:
-        """
-        Render the report as a PDF byte stream.
-
-        Requires WeasyPrint (``pip install shm-ai[reports]``).
-        On Windows, also requires GTK runtime libraries.
-
-        Args:
-            input: The RecommendationInput fed to the pipeline.
-            report: The RecommendationReport produced by RecommendationService.
-            generated_at_utc: Optional fixed timestamp string — see render_html().
-
-        Returns:
-            PDF document as bytes.  The caller is responsible for writing
-            to disk or streaming over HTTP.
-
-        Raises:
-            RuntimeError: If WeasyPrint is not installed.
-        """
+        """Render the report as a PDF byte stream."""
         try:
             import weasyprint
         except ImportError:
             raise RuntimeError(
                 "WeasyPrint is required for PDF generation but is not installed.\n"
                 "Install it with:  pip install 'shm-ai[reports]'\n"
-                "On Windows, GTK runtime libraries are also required — see:\n"
-                "https://github.com/tschoonj/GTK-for-Windows-Runtime-Environment-Installer"
             ) from None
 
-        html = self.render_html(input, report, generated_at_utc)
+        html = self.render_html(
+            input=input,
+            report=report,
+            generated_at_utc=generated_at_utc,
+            asset_name=asset_name,
+            input_image_path=input_image_path,
+            detections=detections,
+            assessment_meta=assessment_meta,
+        )
         return cast("bytes", weasyprint.HTML(string=html).write_pdf())

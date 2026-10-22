@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import type { ModelBuildResult, StructuralComponentData } from './types'
+import type { ModelBuildResult, StructuralComponentData, ComponentStatus } from './types'
 import type { Asset } from '../../../api/assets'
 import type { Inspection } from '../../../api/inspections'
 
@@ -11,8 +11,10 @@ export function buildRoadModel(
   const components = new Map<string, StructuralComponentData>()
 
   // Check for completed inspections with findings
-  const latestInspection = inspections.find((i) => i.defect_count > 0)
-  const hasFindings = Boolean(latestInspection)
+  const completedInspections = inspections.filter((i) => i.status === 'completed')
+  const latestCompleted = completedInspections[0]
+  const inspectionWithFindings = completedInspections.find((i) => i.defect_count > 0)
+  const hasFindings = Boolean(inspectionWithFindings)
 
   // Standard engineering materials
   const matFindings = new THREE.MeshStandardMaterial({
@@ -195,8 +197,20 @@ export function buildRoadModel(
   ]
 
   spans.forEach((span) => {
-    const isTargetMidspan = span.isMidspan && hasFindings
-    const girderMat = isTargetMidspan ? matFindings : matNominal
+    let girderStatus: ComponentStatus = 'not_assessed'
+    if (span.isMidspan) {
+      if (hasFindings && inspectionWithFindings) {
+        girderStatus = 'assessed_findings'
+      } else if (completedInspections.length > 0) {
+        girderStatus = 'assessed_nominal'
+      }
+    }
+
+    const girderMat = girderStatus === 'assessed_findings'
+      ? matFindings
+      : girderStatus === 'assessed_nominal'
+      ? matNominal
+      : matConcrete
 
     const boxGeo = new THREE.BoxGeometry(span.length - 0.2, 1.4, 5.6)
     const boxMesh = new THREE.Mesh(boxGeo)
@@ -209,19 +223,17 @@ export function buildRoadModel(
         name: span.name,
         type: 'girder',
         material: asset.material || 'Prestressed Concrete (Grade C50/60)',
-        status: isTargetMidspan ? 'assessed_findings' : 'assessed_nominal',
+        status: girderStatus,
         designFunction: 'Primary longitudinal flexural box girder resisting traffic live loads and hogging moments',
         dimensions: `${span.length}m × 1.4m × 5.6m`,
-        defectSummary: isTargetMidspan
-          ? `${latestInspection?.defect_count} structural hairline flexural crack(s) observed at midspan soffit via elevated platform inspection.`
+        defectSummary: girderStatus === 'assessed_findings' && inspectionWithFindings
+          ? `${inspectionWithFindings.defect_count} structural defect(s) detected during inspection. Notes: ${inspectionWithFindings.notes || 'Anomalies identified.'}`
           : undefined,
-        findingsCount: isTargetMidspan ? latestInspection?.defect_count : 0,
-        linkedEvidencePaths: isTargetMidspan
-          ? [
-              '/uploads/evidence/m25_j14_flyover_approach.jpg',
-              '/uploads/evidence/m25_j14_terminal5_sliproad_pier.jpg',
-              '/uploads/evidence/m25_j14_interchange_gantry_superstructure.jpg',
-            ]
+        findingsCount: girderStatus === 'assessed_findings' ? inspectionWithFindings?.defect_count : 0,
+        inspectionId: girderStatus === 'assessed_findings' ? inspectionWithFindings?.id : girderStatus === 'assessed_nominal' ? latestCompleted?.id : undefined,
+        inspectionDate: girderStatus === 'assessed_findings' ? inspectionWithFindings?.created_at : girderStatus === 'assessed_nominal' ? latestCompleted?.created_at : undefined,
+        linkedEvidencePaths: girderStatus === 'assessed_findings' && inspectionWithFindings?.input_path
+          ? [inspectionWithFindings.input_path]
           : undefined,
       },
       girderMat

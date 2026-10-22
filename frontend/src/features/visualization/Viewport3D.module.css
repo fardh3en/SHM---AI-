@@ -29,9 +29,29 @@
 }
 
 /* ── HUD Top-Left Badge: Parametric Illustrative Indicator ─────────── */
+.modelDisclaimerBanner {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  background: rgba(23, 23, 21, 0.92);
+  border-bottom: 1px solid rgba(216, 198, 90, 0.2);
+  padding: 4px 12px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-stone);
+  text-align: center;
+  z-index: 15;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  letter-spacing: 0.02em;
+}
+
 .hudBadgeTopLeft {
   position: absolute;
-  top: var(--space-4);
+  top: calc(var(--space-4) + 22px);
   left: var(--space-4);
   z-index: 10;
   display: flex;

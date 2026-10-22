@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import type { ModelBuildResult, StructuralComponentData } from './types'
+import type { ModelBuildResult, StructuralComponentData, ComponentStatus } from './types'
 import type { Asset } from '../../../api/assets'
 import type { Inspection } from '../../../api/inspections'
 
@@ -10,8 +10,10 @@ export function buildBuildingModel(
   const group = new THREE.Group()
   const components = new Map<string, StructuralComponentData>()
 
-  const latestInspection = inspections.find((i) => i.defect_count > 0)
-  const hasFindings = Boolean(latestInspection)
+  const completedInspections = inspections.filter((i) => i.status === 'completed')
+  const latestCompleted = completedInspections[0]
+  const inspectionWithFindings = completedInspections.find((i) => i.defect_count > 0)
+  const hasFindings = Boolean(inspectionWithFindings)
 
   const matFindings = new THREE.MeshStandardMaterial({
     color: '#E0564A',
@@ -104,11 +106,14 @@ export function buildBuildingModel(
       const spanD = Math.abs(colsZ[1] - colsZ[0])
 
       const isDefectBay = isLevelC && bx === 0
-      const bayStatus = isDefectBay && hasFindings
-        ? 'assessed_findings'
-        : isLevelC
-        ? 'assessed_nominal'
-        : 'not_assessed'
+      let bayStatus: ComponentStatus = 'not_assessed'
+      if (isDefectBay) {
+        if (hasFindings && inspectionWithFindings) {
+          bayStatus = 'assessed_findings'
+        } else if (completedInspections.length > 0) {
+          bayStatus = 'assessed_nominal'
+        }
+      }
 
       const bayMat = bayStatus === 'assessed_findings'
         ? matFindings
@@ -124,22 +129,20 @@ export function buildBuildingModel(
         slabMesh,
         {
           id: `SLAB-BAY-LVL${lvlIdx + 1}-BAY${bx + 1}`,
-          name: isDefectBay ? 'Deck C - Span Bay 1-2 (Active Spall Zone)' : `Parking Deck Slab Bay ${bx + 1} (Level ${lvlIdx + 1})`,
+          name: isDefectBay ? 'Deck C - Span Bay 1-2' : `Parking Deck Slab Bay ${bx + 1} (Level ${lvlIdx + 1})`,
           type: 'slab_bay',
           material: asset.material || 'Post-Tensioned Concrete (Unbonded Monostrand)',
           status: bayStatus,
           designFunction: 'Two-way post-tensioned slab resisting vehicle wheel loads',
           dimensions: `${spanW.toFixed(1)}m × ${spanD.toFixed(1)}m × 0.4m`,
-          defectSummary: isDefectBay && hasFindings
-            ? `${latestInspection?.notes || 'Large structural crack crossing main deck spans. Rebar exposure indicates severe carbonation.'} (Defect count: ${latestInspection?.defect_count})`
+          defectSummary: bayStatus === 'assessed_findings' && inspectionWithFindings
+            ? `${inspectionWithFindings.defect_count} structural defect(s) detected during inspection. Notes: ${inspectionWithFindings.notes || 'Anomalies identified.'}`
             : undefined,
-          findingsCount: isDefectBay ? latestInspection?.defect_count : 0,
-          linkedEvidencePaths: isDefectBay
-            ? [
-                '/uploads/evidence/parking_deck_carbonation_rebar.jpg',
-                '/uploads/evidence/parking_slab_efflorescence_cracking.jpg',
-                '/uploads/evidence/parking_garage_shear_crack_soffit.jpg',
-              ]
+          findingsCount: bayStatus === 'assessed_findings' ? inspectionWithFindings?.defect_count : 0,
+          inspectionId: bayStatus === 'assessed_findings' ? inspectionWithFindings?.id : bayStatus === 'assessed_nominal' ? latestCompleted?.id : undefined,
+          inspectionDate: bayStatus === 'assessed_findings' ? inspectionWithFindings?.created_at : bayStatus === 'assessed_nominal' ? latestCompleted?.created_at : undefined,
+          linkedEvidencePaths: bayStatus === 'assessed_findings' && inspectionWithFindings?.input_path
+            ? [inspectionWithFindings.input_path]
             : undefined,
         },
         bayMat

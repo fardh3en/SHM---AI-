@@ -17,6 +17,7 @@ import {
   Layers,
   AlertTriangle,
   Info,
+  ShieldCheck,
 } from 'lucide-react'
 import styles from './VisionAnalysisPage.module.css'
 
@@ -458,9 +459,54 @@ export default function VisionAnalysisPage() {
         <div className={styles.provenanceNotice} role="note">
           <strong>Computer Vision Architecture Notice:</strong> Defect classifications, bounding box
           coordinates, and pixel geometries are generated deterministically by the YOLO11 segmentation
-          model (`yolo11n-seg.pt`). Defect measurements (area, length, average width) are reported in
+          model (<code className={styles.protocolValCode}>yolo11n-seg.pt</code>). Defect measurements (area, length, average width) are reported in
           pixel space; physical millimeter calibration requires known Ground Sampling Distance (GSD) or
           on-site reference fiducials.
+        </div>
+
+        {/* Model Verification & Benchmark Evaluation Protocol */}
+        <div className={styles.protocolCard} role="region" aria-label="Model Verification & Evaluation Protocol">
+          <div className={styles.protocolHeader}>
+            <div className={styles.protocolTitle}>
+              <ShieldCheck size={16} color="var(--color-mineral)" />
+              <span>Model Verification &amp; Evaluation Protocol</span>
+            </div>
+            <span className={styles.protocolBadge}>Validation Protocol Active</span>
+          </div>
+
+          <div className={styles.protocolGrid}>
+            <div className={styles.protocolItem}>
+              <span className={styles.protocolLabel}>Formal Benchmark Status</span>
+              <span className={styles.protocolVal}>
+                Awaiting local ground-truth benchmark annotation ingestion. No synthetic or fabricated precision/recall/mAP scores are reported without verified test sets.
+              </span>
+            </div>
+
+            <div className={styles.protocolItem}>
+              <span className={styles.protocolLabel}>Target Evaluation Metrics</span>
+              <span className={styles.protocolVal}>
+                <span className={styles.protocolValCode}>mAP@50</span> (PASCAL VOC / COCO metric) and <span className={styles.protocolValCode}>mAP@50:95</span> with strict IoU threshold <span className={styles.protocolValCode}>&ge; 0.50</span> for defect localization.
+              </span>
+            </div>
+
+            <div className={styles.protocolItem}>
+              <span className={styles.protocolLabel}>Validated Defect Classes</span>
+              <span className={styles.protocolVal}>
+                Crack, Spall, Corrosion / Rebar Exposure, Efflorescence, Delamination.
+              </span>
+            </div>
+
+            <div className={styles.protocolItem}>
+              <span className={styles.protocolLabel}>Physical Metric Calibration</span>
+              <span className={styles.protocolVal}>
+                Geometric measurements in pixels require GSD calibration: <span className={styles.protocolValCode}>GSD = (sensor_pitch &times; distance) / focal_length</span> before physical engineering sign-off.
+              </span>
+            </div>
+          </div>
+
+          <div className={styles.protocolDisclaimer}>
+            <strong>Engineering Compliance Disclosure:</strong> Under structural engineering evaluation protocols, detection confidence reflects convolutional neural network activation probabilities and does not equate to structural failure risk. Structural risk assessment is governed by the ACI 318 / Eurocode 2 limit-state criteria implemented in the deterministic Structural Assessment engine.
+          </div>
         </div>
       </div>
     </div>

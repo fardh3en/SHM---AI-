@@ -321,3 +321,69 @@
   border: 1px dashed var(--border-subtle);
   border-radius: var(--radius-md);
 }
+
+/* ── Ledger Thumbnails, Provenance & Action Links ──────────────────── */
+.thumbCell {
+  width: 52px;
+  padding: var(--space-2) !important;
+}
+
+.evidenceThumb {
+  width: 48px;
+  height: 36px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-medium);
+  background: var(--bg-base);
+  display: block;
+}
+
+.thumbPlaceholder {
+  width: 48px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  border: 1px dashed var(--border-subtle);
+  background: var(--bg-base);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-dim);
+}
+
+.methodTag {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+  background: var(--bg-base);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 2px 6px;
+  white-space: nowrap;
+}
+
+.actionLinks {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.actionIconBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  color: var(--color-mineral);
+  text-decoration: none;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-subtle);
+  padding: 3px 6px;
+  border-radius: var(--radius-sm);
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+}
+
+.actionIconBtn:hover {
+  background: var(--bg-surface);
+  border-color: var(--color-mineral);
+}

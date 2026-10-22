@@ -5,6 +5,7 @@ Orchestrates inspection lifecycle:
 - Creation (validates asset exists)
 - Status transitions (PENDING → PROCESSING → COMPLETED / FAILED)
 - Results population (Phase 2 vision pipeline execution)
+- Automated structural health assessment execution (Phase 3 & 6)
 - Querying by asset or status
 """
 import logging
@@ -24,6 +25,7 @@ from backend.app.schemas.inspection import InspectionCreate, InspectionUpdate
 from backend.app.services.base import BaseService
 
 if TYPE_CHECKING:
+    from backend.app.models.detection import Detection
     from vision.pipeline.base import IInferencePipeline
 
 logger = logging.getLogger(__name__)
@@ -84,8 +86,6 @@ class InspectionService(BaseService):
 
         Returns:
             Tuple of (Inspection ORM objects for the requested page, total record count).
-            Callers (typically API endpoints) are responsible for wrapping this
-            in a PaginatedResponse[ResponseSchema] using their own Pydantic schema.
         """
         return await self._repo.get_all(
             page=page,
@@ -96,22 +96,131 @@ class InspectionService(BaseService):
         """Return all inspections for a specific asset (newest first)."""
         return await self._repo.get_by_asset(asset_id)
 
-    async def get_detections_for_inspection(self, inspection_id: str) -> list[Detection]:
+    async def get_detections_for_inspection(self, inspection_id: str) -> list["Detection"]:
         """Return all Detection records belonging to a given inspection."""
         return await self._detection_repo.get_by_inspection(inspection_id)
+
+    async def compare_inspections(
+        self, asset_id: str, base_id: str, target_id: str
+    ):
+        """
+        Compare two inspections belonging to the same asset.
+
+        Enforces asset boundary integrity, computes defect set transitions,
+        delta scores, and adds structural engineering comparability disclosures.
+        """
+        from backend.app.repositories.health_record_repository import HealthRecordRepository
+        from backend.app.schemas.comparison import (
+            InspectionComparisonResponse,
+            InspectionComparisonSummary,
+        )
+
+        base_insp = await self._repo.get_by_id(base_id)
+        target_insp = await self._repo.get_by_id(target_id)
+
+        if base_insp is None or target_insp is None:
+            raise ValidationError("Both base and target inspections must exist to perform comparison.")
+
+        if base_insp.asset_id != asset_id or target_insp.asset_id != asset_id:
+            raise ValidationError(
+                f"Both inspections must belong to asset '{asset_id}'. "
+                f"Base belongs to '{base_insp.asset_id}', Target belongs to '{target_insp.asset_id}'."
+            )
+
+        asset = await self._asset_repo.get_by_id(asset_id)
+        if asset is None:
+            raise ValidationError(f"Asset '{asset_id}' not found.")
+
+        base_dets = await self._detection_repo.get_by_inspection(base_id)
+        target_dets = await self._detection_repo.get_by_inspection(target_id)
+
+        health_repo = HealthRecordRepository(self.session)
+        base_record = await health_repo.get_latest_for_inspection(base_id)
+        target_record = await health_repo.get_latest_for_inspection(target_id)
+
+        base_types = {d.defect_type.value for d in base_dets}
+        target_types = {d.defect_type.value for d in target_dets}
+
+        common_types = sorted(base_types & target_types)
+        newly_observed = sorted(target_types - base_types)
+        absent_in_target = sorted(base_types - target_types)
+
+        base_area = sum(d.area_px for d in base_dets if d.area_px is not None)
+        target_area = sum(d.area_px for d in target_dets if d.area_px is not None)
+        area_delta = round(target_area - base_area, 2) if (base_dets or target_dets) else None
+
+        score_delta = None
+        if base_insp.health_score is not None and target_insp.health_score is not None:
+            score_delta = round(target_insp.health_score - base_insp.health_score, 2)
+
+        if base_insp.status != InspectionStatus.COMPLETED or target_insp.status != InspectionStatus.COMPLETED:
+            comparability = "incomparable"
+        elif base_insp.input_path == target_insp.input_path:
+            comparability = "comparable"
+        else:
+            comparability = "partially_comparable"
+
+        disclosures = [
+            "Newly observed defect categories in the target inspection may represent newly developed physical deterioration OR pre-existing defects uncaptured during previous photographic framing.",
+            "Absence of a previously observed defect category in the target inspection does NOT prove that remedial structural repair occurred; viewing perspective, lighting, or coverage may vary.",
+            "Pixel measurement deltas (area_px) are indicative only and assume consistent camera distance, framing, and optical resolution.",
+            "Structural health score delta requires equivalent scoring models and assessment versions for engineering validity.",
+        ]
+
+        base_summary = InspectionComparisonSummary(
+            id=base_insp.id,
+            created_at=base_insp.created_at.isoformat() if base_insp.created_at else "",
+            source=base_insp.source.value,
+            status=base_insp.status.value,
+            defect_count=base_insp.defect_count,
+            health_score=base_insp.health_score,
+            assessment_method=base_record.assessment_method if base_record else None,
+            input_path=base_insp.input_path,
+            defect_types=sorted(base_types),
+            total_area_px=round(base_area, 2) if base_dets else None,
+        )
+
+        target_summary = InspectionComparisonSummary(
+            id=target_insp.id,
+            created_at=target_insp.created_at.isoformat() if target_insp.created_at else "",
+            source=target_insp.source.value,
+            status=target_insp.status.value,
+            defect_count=target_insp.defect_count,
+            health_score=target_insp.health_score,
+            assessment_method=target_record.assessment_method if target_record else None,
+            input_path=target_insp.input_path,
+            defect_types=sorted(target_types),
+            total_area_px=round(target_area, 2) if target_dets else None,
+        )
+
+        return InspectionComparisonResponse(
+            asset_id=asset.id,
+            asset_name=asset.name,
+            base_inspection=base_summary,
+            target_inspection=target_summary,
+            comparability_status=comparability,
+            common_defect_types=common_types,
+            newly_observed_defect_types=newly_observed,
+            previously_observed_defect_types_absent=absent_in_target,
+            health_score_delta=score_delta,
+            defect_count_delta=target_insp.defect_count - base_insp.defect_count,
+            measurement_comparison={
+                "base_total_area_px": round(base_area, 2) if base_dets else None,
+                "target_total_area_px": round(target_area, 2) if target_dets else None,
+                "area_delta_px": area_delta,
+                "comparability_caveat": (
+                    "Identical media source" if comparability == "comparable"
+                    else "Different media sources — metric comparison is uncalibrated"
+                ),
+            },
+            disclosures_and_limitations=disclosures,
+        )
 
     async def update_inspection(
         self, inspection_id: str, data: InspectionUpdate
     ) -> Inspection | None:
         """
         Update inspection fields (PATCH semantics).
-
-        Typically called by:
-        - The vision engine to set status=PROCESSING and later COMPLETED
-        - The API to record notes or correct error state
-
-        Returns:
-            Updated Inspection, or None if not found.
         """
         inspection = await self._repo.get_by_id(inspection_id)
         if inspection is None:
@@ -126,7 +235,7 @@ class InspectionService(BaseService):
         return updated
 
     async def get_pending_inspections(self) -> list[Inspection]:
-        """Return all PENDING inspections. Used by the job queue in Phase 2."""
+        """Return all PENDING inspections. Used by the job queue."""
         return await self._repo.get_pending()
 
     @staticmethod
@@ -156,27 +265,8 @@ class InspectionService(BaseService):
         pipeline: "IInferencePipeline | None" = None,
     ) -> Inspection | None:
         """
-        Execute the computer vision pipeline for an inspection, synchronously.
-
-        Runs entirely within the current request (no background task queue —
-        this is a deliberate Phase 2 scope decision; async workers are planned
-        for a later phase). Transitions the inspection through
-        PENDING/PROCESSING -> COMPLETED or FAILED, and persists one Detection
-        row per defect found.
-
-        Args:
-            inspection_id: UUID of the inspection to process.
-            pipeline: Vision inference pipeline (injected by the caller so this
-                service stays decoupled from any concrete detector implementation).
-
-        Returns:
-            The updated Inspection with results populated, or None if the
-            inspection does not exist.
-
-        Raises:
-            ValidationError: If the inspection has no input_path or invalid status.
-            ModelNotFoundError: If configured vision model weights are missing.
-            InferenceError: If model inference fails.
+        Execute the computer vision pipeline for an inspection, synchronously,
+        followed by automated structural health assessment and score persistence.
         """
         inspection = await self._repo.get_by_id(inspection_id)
         if inspection is None:
@@ -303,8 +393,26 @@ class InspectionService(BaseService):
             defect_count=len(detection_results),
             processing_time_ms=elapsed_ms,
         )
+
+        # ── 6. Automated Structural Health Assessment ─────────────────────────
+        try:
+            from backend.app.services.structural_assessment_service import (
+                StructuralAssessmentService,
+            )
+            assessment_svc = StructuralAssessmentService(self.session)
+            await assessment_svc.assess_inspection(inspection_id, force_reassess=True)
+            refreshed = await self._repo.get_by_id(inspection_id)
+            if refreshed is not None:
+                updated = refreshed
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                f"Automated health assessment failed for inspection {inspection_id!r}: {exc}",
+                exc_info=True,
+            )
+
         logger.info(
             f"Inspection processing completed: id={inspection_id!r} "
-            f"defects={len(detection_results)} time={elapsed_ms:.1f}ms"
+            f"defects={len(detection_results)} time={elapsed_ms:.1f}ms "
+            f"health_score={updated.health_score}"
         )
         return updated

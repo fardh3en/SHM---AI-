@@ -17,7 +17,7 @@ class InspectionRepository(BaseRepository[Inspection]):
         result = await self.session.execute(
             select(Inspection)
             .where(Inspection.asset_id == asset_id)
-            .order_by(Inspection.created_at.desc())
+            .order_by(Inspection.created_at.desc(), Inspection.id.desc())
         )
         return list(result.scalars().all())
 
@@ -36,7 +36,7 @@ class InspectionRepository(BaseRepository[Inspection]):
                 Inspection.asset_id == asset_id,
                 Inspection.status == InspectionStatus.COMPLETED,
             )
-            .order_by(Inspection.created_at.desc())
+            .order_by(Inspection.created_at.desc(), Inspection.id.desc())
             .limit(1)
         )
         return result.scalar_one_or_none()

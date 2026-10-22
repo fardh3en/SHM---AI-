@@ -6,9 +6,11 @@ Endpoints only handle: request parsing, service invocation, and response mapping
 """
 from fastapi import APIRouter, HTTPException, Query, status
 
-from backend.app.dependencies import AssetServiceDep
+from backend.app.core.exceptions import ValidationError
+from backend.app.dependencies import AssetServiceDep, InspectionServiceDep
 from backend.app.schemas.asset import AssetCreate, AssetResponse, AssetUpdate
 from backend.app.schemas.common import MessageResponse, PaginatedResponse
+from backend.app.schemas.comparison import InspectionComparisonResponse
 
 router = APIRouter(prefix="/assets", tags=["Assets"])
 
@@ -73,6 +75,38 @@ async def get_asset(
             detail=f"Asset '{asset_id}' not found.",
         )
     return AssetResponse.model_validate(asset)
+
+
+@router.get(
+    "/{asset_id}/inspections/compare",
+    response_model=InspectionComparisonResponse,
+    summary="Compare two inspections of an asset",
+    description=(
+        "Compares base and target inspections belonging to this asset. "
+        "Evaluates common defect categories, newly observed categories, "
+        "absent categories, score delta, and discloses engineering comparability limits."
+    ),
+    responses={
+        400: {"description": "Validation error or asset mismatch"},
+        404: {"description": "Inspection not found"},
+    },
+)
+async def compare_asset_inspections(
+    asset_id: str,
+    service: InspectionServiceDep,
+    base_id: str = Query(..., description="UUID of the base / earlier inspection"),
+    target_id: str = Query(..., description="UUID of the target / later inspection"),
+) -> InspectionComparisonResponse:
+    """Compare two inspections of an asset."""
+    try:
+        return await service.compare_inspections(
+            asset_id=asset_id, base_id=base_id, target_id=target_id
+        )
+    except ValidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=exc.message if hasattr(exc, "message") else str(exc),
+        ) from exc
 
 
 @router.patch(

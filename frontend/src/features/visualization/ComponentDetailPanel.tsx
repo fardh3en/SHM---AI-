@@ -234,13 +234,75 @@ export default function ComponentDetailPanel({
         </div>
 
         {/* Anomaly & Findings Summary */}
-        {component.defectSummary && (
+        {component.status === 'assessed_findings' && (
           <div className={styles.findingsCard}>
             <h4 className={styles.findingsTitle}>
               <AlertTriangle size={13} />
-              <span>Inspection Observation</span>
+              <span>Inspection Observation &amp; Defect Data</span>
             </h4>
-            <p className={styles.findingsText}>{component.defectSummary}</p>
+            <p className={styles.findingsText}>
+              {component.defectSummary || `${component.findingsCount || 1} defect(s) detected on this member.`}
+            </p>
+            {component.inspectionId && (
+              <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid rgba(224, 86, 74, 0.2)', fontSize: '11px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <div>
+                  <span style={{ color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>INSPECTION ID: </span>
+                  <Link to={`/vision?inspectionId=${component.inspectionId}`} style={{ color: 'var(--color-mineral)', textDecoration: 'underline', fontFamily: 'var(--font-mono)' }}>
+                    {component.inspectionId.slice(0, 8)}... (View in Vision Studio)
+                  </Link>
+                </div>
+                {component.inspectionDate && (
+                  <div>
+                    <span style={{ color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>INSPECTED ON: </span>
+                    <span style={{ color: 'var(--text-body)', fontFamily: 'var(--font-mono)' }}>
+                      {new Date(component.inspectionDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {component.status === 'assessed_nominal' && (
+          <div className={styles.findingsCard} style={{ borderColor: 'var(--border-subtle)', background: 'var(--bg-base)' }}>
+            <h4 className={styles.findingsTitle} style={{ color: 'var(--status-good)' }}>
+              <CheckCircle2 size={13} color="var(--status-good)" />
+              <span>Nominal Condition Verified</span>
+            </h4>
+            <p className={styles.findingsText}>
+              Member surveyed in inspection cycle with zero defect anomalies detected.
+            </p>
+            {component.inspectionId && (
+              <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid var(--border-subtle)', fontSize: '11px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <div>
+                  <span style={{ color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>INSPECTION ID: </span>
+                  <Link to={`/vision?inspectionId=${component.inspectionId}`} style={{ color: 'var(--color-mineral)', textDecoration: 'underline', fontFamily: 'var(--font-mono)' }}>
+                    {component.inspectionId.slice(0, 8)}... (View in Vision Studio)
+                  </Link>
+                </div>
+                {component.inspectionDate && (
+                  <div>
+                    <span style={{ color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>INSPECTED ON: </span>
+                    <span style={{ color: 'var(--text-body)', fontFamily: 'var(--font-mono)' }}>
+                      {new Date(component.inspectionDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {(component.status === 'not_assessed' || component.status === 'illustrative') && (
+          <div className={styles.findingsCard} style={{ borderColor: 'var(--border-subtle)', background: 'var(--bg-base)' }}>
+            <h4 className={styles.findingsTitle} style={{ color: 'var(--text-muted)' }}>
+              <HelpCircle size={13} />
+              <span>No Inspection Data Recorded</span>
+            </h4>
+            <p className={styles.findingsText}>
+              No inspection data recorded for this structural component. This member is represented via parametric geometry for spatial reference only.
+            </p>
           </div>
         )}
 

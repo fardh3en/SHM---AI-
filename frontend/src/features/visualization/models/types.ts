@@ -51,6 +51,8 @@ export interface StructuralComponentData {
   findingsCount?: number
   linkedEvidencePaths?: string[]
   inspectionNotes?: string
+  inspectionId?: string
+  inspectionDate?: string
 }
 
 export interface ModelBuildResult {

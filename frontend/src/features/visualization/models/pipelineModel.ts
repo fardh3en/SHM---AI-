@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import type { ModelBuildResult, StructuralComponentData } from './types'
+import type { ModelBuildResult, StructuralComponentData, ComponentStatus } from './types'
 import type { Asset } from '../../../api/assets'
 import type { Inspection } from '../../../api/inspections'
 
@@ -10,13 +10,20 @@ export function buildPipelineModel(
   const group = new THREE.Group()
   const components = new Map<string, StructuralComponentData>()
 
-  const latestInspection = inspections.find((i) => i.defect_count > 0)
-  const hasFindings = Boolean(latestInspection)
+  const completedInspections = inspections.filter((i) => i.status === 'completed')
+  const latestCompleted = completedInspections[0]
+  const inspectionWithFindings = completedInspections.find((i) => i.defect_count > 0)
+  const hasFindings = Boolean(inspectionWithFindings)
 
   const matFindings = new THREE.MeshStandardMaterial({
     color: '#E0564A',
     roughness: 0.35,
     metalness: 0.5,
+  })
+  const matNominal = new THREE.MeshStandardMaterial({
+    color: '#B6BDA8',
+    roughness: 0.45,
+    metalness: 0.2,
   })
   const matSupply = new THREE.MeshStandardMaterial({
     color: '#D8C65A', // Mineral yellow for thermal supply
@@ -77,7 +84,7 @@ export function buildPipelineModel(
     { name: 'Return Pipe (Low Temp 65°C)', z: 1.2, mat: matReturn, type: 'pipe_carrier' as const, id: 'PIPE-RETURN-MAIN' },
   ]
 
-  pipeRuns.forEach((run) => {
+  pipeRuns.forEach((run, runIdx) => {
     // Pipe straight section
     const pipeL = 28
     const pipeGeo = new THREE.CylinderGeometry(0.55, 0.55, pipeL, 24)
@@ -85,8 +92,21 @@ export function buildPipelineModel(
     pipeMesh.rotation.z = Math.PI / 2
     pipeMesh.position.set(0, 0, run.z)
 
-    const pipeStatus = hasFindings ? 'assessed_findings' : 'not_assessed'
-    const finalMat = pipeStatus === 'assessed_findings' ? matFindings : run.mat
+    const isTargetRun = runIdx === 0
+    let pipeStatus: ComponentStatus = 'not_assessed'
+    if (isTargetRun) {
+      if (hasFindings && inspectionWithFindings) {
+        pipeStatus = 'assessed_findings'
+      } else if (completedInspections.length > 0) {
+        pipeStatus = 'assessed_nominal'
+      }
+    }
+
+    const finalMat = pipeStatus === 'assessed_findings'
+      ? matFindings
+      : pipeStatus === 'assessed_nominal'
+      ? matNominal
+      : run.mat
 
     registerMesh(
       pipeMesh,
@@ -98,13 +118,15 @@ export function buildPipelineModel(
         status: pipeStatus,
         designFunction: 'Carries pressurized hot district heating water under cyclical thermal expansions',
         dimensions: 'DN 250 (Outer diameter 355mm with jacket) × 28m span',
-        defectSummary: hasFindings
-          ? `Baseline walkthrough noted potential insulation casing wear and joint distress.`
+        defectSummary: pipeStatus === 'assessed_findings' && inspectionWithFindings
+          ? `${inspectionWithFindings.defect_count} structural defect(s) detected during inspection. Notes: ${inspectionWithFindings.notes || 'Anomalies identified.'}`
           : undefined,
-        linkedEvidencePaths: [
-          '/uploads/evidence/district_heating_preinsulated_pipes.jpg',
-          '/uploads/evidence/district_heating_expansion_trench.jpg',
-        ],
+        findingsCount: pipeStatus === 'assessed_findings' ? inspectionWithFindings?.defect_count : 0,
+        inspectionId: pipeStatus === 'assessed_findings' ? inspectionWithFindings?.id : pipeStatus === 'assessed_nominal' ? latestCompleted?.id : undefined,
+        inspectionDate: pipeStatus === 'assessed_findings' ? inspectionWithFindings?.created_at : pipeStatus === 'assessed_nominal' ? latestCompleted?.created_at : undefined,
+        linkedEvidencePaths: pipeStatus === 'assessed_findings' && inspectionWithFindings?.input_path
+          ? [inspectionWithFindings.input_path]
+          : undefined,
       },
       finalMat
     )

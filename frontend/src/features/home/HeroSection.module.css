@@ -17,39 +17,19 @@
   margin-left: auto;
 }
 
-/* Right — plum dark */
+/* Right — deep charcoal containing 3D X-Ray building digital twin */
 .right {
-  background: var(--bg-inverse);
+  background: #151514;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--space-12);
+  align-items: stretch;
+  justify-content: stretch;
+  padding: 0;
   position: relative;
   overflow: hidden;
 }
 
-/* Subtle texture on dark panel */
 .right::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: repeating-linear-gradient(
-    -45deg,
-    rgba(255,255,255,0.012) 0px,
-    rgba(255,255,255,0.012) 1px,
-    transparent 1px,
-    transparent 28px
-  );
-  pointer-events: none;
-}
-
-/* Diagram */
-.diagram {
-  width: 100%;
-  max-width: 440px;
-  height: auto;
-  position: relative;
-  z-index: 1;
+  display: none;
 }
 
 /* Eyebrow */
@@ -166,15 +146,14 @@
     order: 2;
   }
   .right {
-    min-height: 300px;
+    min-height: 520px;
     order: 1;
-    padding: var(--space-8);
+    padding: var(--space-4);
   }
-  .diagram { max-width: 380px; }
 }
 
 @media (max-width: 640px) {
   .left { padding: var(--space-10) var(--space-5); gap: var(--space-5); }
-  .right { min-height: 240px; }
+  .right { min-height: 440px; padding: var(--space-3); }
   .actions { flex-direction: column; align-items: flex-start; }
 }

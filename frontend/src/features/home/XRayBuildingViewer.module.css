@@ -1,0 +1,525 @@
+/* ==========================================================================
+   SHM-AI Homepage Interactive 3D X-Ray Building Viewer
+   Full-Scene Structural Diagnostics & 3D Defect Visualization.
+   ========================================================================== */
+
+.viewerContainer {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 620px;
+  background: #151514;
+  overflow: hidden;
+  user-select: none;
+  font-family: var(--font-body, 'Inter', system-ui, sans-serif);
+}
+
+.viewerContainer:fullscreen {
+  min-height: 100vh;
+}
+
+/* Three.js Canvas Stage */
+.canvasStage {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  cursor: grab;
+}
+
+.canvasStage:active {
+  cursor: grabbing;
+}
+
+/* Subtle Vignette & Gradient Overlays */
+.vignetteOverlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    circle at 50% 48%,
+    transparent 50%,
+    rgba(21, 21, 20, 0.45) 82%,
+    rgba(17, 17, 16, 0.9) 100%
+  );
+  z-index: 2;
+}
+
+/* ── Mode Selector: Vertical Floating Stack (Top Left) ────────────────────── */
+.modeSelector {
+  position: absolute;
+  top: 24px;
+  left: 24px;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.modeBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(24, 23, 22, 0.88);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid #414039;
+  color: rgba(240, 238, 231, 0.78);
+  font-family: var(--font-body, system-ui, sans-serif);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  padding: 8px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.modeBtn:hover {
+  color: #f0eee7;
+  background: rgba(32, 31, 28, 0.96);
+  border-color: #55534a;
+}
+
+.modeBtnActive {
+  background: rgba(32, 31, 28, 0.98);
+  border-color: #d8c65a;
+  color: #d8c65a;
+  box-shadow: 0 0 14px rgba(216, 198, 90, 0.22);
+}
+
+.modeBtnActive:hover {
+  background: rgba(38, 36, 32, 1);
+  border-color: #e2d26f;
+  color: #e2d26f;
+}
+
+/* ── Top-Center: Diagnostic Layer Toggles HUD ──────────────────────────────── */
+.hudLayerBar {
+  position: absolute;
+  top: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(24, 23, 22, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid #414039;
+  border-radius: 9999px;
+  padding: 4px 6px;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.45);
+}
+
+.hudPillBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: none;
+  color: rgba(240, 238, 231, 0.7);
+  font-family: var(--font-body, system-ui, sans-serif);
+  font-size: 0.71875rem;
+  font-weight: 500;
+  padding: 5px 12px;
+  border-radius: 9999px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.hudPillBtn:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.hudPillBtnActive {
+  background: rgba(216, 198, 90, 0.18);
+  color: #d8c65a;
+  font-weight: 600;
+}
+
+.hudDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+/* ── Top-Right: Mini Building Preview Card ─────────────────────────────────── */
+.buildingPreviewCard {
+  position: absolute;
+  top: 24px;
+  right: 24px;
+  z-index: 10;
+  background: rgba(24, 23, 22, 0.88);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid #414039;
+  border-radius: 10px;
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 140px;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.45);
+}
+
+.previewHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #f0eee7;
+}
+
+.previewGraphic {
+  width: 100%;
+  height: 58px;
+  border-radius: 6px;
+  background: #191817;
+  border: 1px solid #33322d;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.miniBuildingSvg {
+  width: 100%;
+  height: 100%;
+}
+
+/* ── Screen-Space Projected Hotspots & Depth Tags ─────────────────────────── */
+.pinsOverlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 8;
+  overflow: hidden;
+}
+
+.spatialCalloutTag {
+  position: absolute;
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(22, 21, 20, 0.92);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid #d8c65a;
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: #d8c65a;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6), 0 0 10px rgba(216, 198, 90, 0.25);
+  transform: translate(-50%, -100%);
+  white-space: nowrap;
+}
+
+.spatialTagAmber {
+  border-color: #e06a3b;
+  color: #e06a3b;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6), 0 0 10px rgba(224, 106, 59, 0.25);
+}
+
+.spatialTagCyan {
+  border-color: #38bdf8;
+  color: #38bdf8;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6), 0 0 10px rgba(56, 189, 248, 0.25);
+}
+
+/* ── Floating Diagnostic Card: Column C-03 (Reference 1) ──────────────────── */
+.diagnosticCard {
+  position: absolute;
+  top: 28%;
+  right: 110px;
+  width: 290px;
+  background: rgba(22, 21, 20, 0.94);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid #414039;
+  border-radius: 10px;
+  padding: 14px;
+  box-shadow: 0 18px 45px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(216, 198, 90, 0.15);
+  z-index: 20;
+  color: #f0eee7;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  animation: cardFadeIn 0.25s ease;
+}
+
+@keyframes cardFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.cardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.cardTitleBlock {
+  display: flex;
+  flex-direction: column;
+}
+
+.cardIdTag {
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: #d8c65a;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.cardTitle {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.cardArrowLink {
+  color: #d8c65a;
+  display: flex;
+  align-items: center;
+  transition: transform 0.15s ease;
+}
+
+.cardArrowLink:hover {
+  transform: translateX(3px);
+}
+
+.cardBody {
+  display: flex;
+  gap: 12px;
+}
+
+.thumbContainer {
+  position: relative;
+  width: 78px;
+  height: 82px;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid #414039;
+  flex-shrink: 0;
+  background: #111010;
+}
+
+.thumbImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.thumbOverlayTag {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(18, 17, 16, 0.88);
+  font-size: 0.5625rem;
+  font-weight: 600;
+  color: #f0eee7;
+  text-align: center;
+  padding: 2px 0;
+}
+
+.metricsCol {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+  flex: 1;
+}
+
+.metricRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.6875rem;
+  line-height: 1.25;
+}
+
+.metricName {
+  color: rgba(240, 238, 231, 0.6);
+}
+
+.metricVal {
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.metricHighlight {
+  color: #d8c65a;
+  font-weight: 600;
+}
+
+.metricDepthAmber {
+  color: #e06a3b;
+  font-weight: 600;
+}
+
+.statusAttention {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #d8c65a;
+  font-weight: 600;
+}
+
+.statusDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #d8c65a;
+  box-shadow: 0 0 6px rgba(216, 198, 90, 0.6);
+}
+
+/* Engineering Directive Banner */
+.cardDirectiveBox {
+  background: rgba(216, 198, 90, 0.08);
+  border-left: 3px solid #d8c65a;
+  border-radius: 0 4px 4px 0;
+  padding: 6px 8px;
+  font-size: 0.6875rem;
+  color: rgba(240, 238, 231, 0.88);
+  line-height: 1.35;
+}
+
+/* ── Far-Right: Vertical Floor Selector (Reference 1) ─────────────────────── */
+.floorSelector {
+  position: absolute;
+  right: 24px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: rgba(24, 23, 22, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid #414039;
+  border-radius: 8px;
+  padding: 6px 4px;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.45);
+}
+
+.floorBtn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: rgba(240, 238, 231, 0.65);
+  font-family: var(--font-body, system-ui, sans-serif);
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  min-width: 44px;
+  text-align: center;
+}
+
+.floorBtn:hover {
+  color: #f0eee7;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.floorBtnActive {
+  background: rgba(36, 34, 30, 0.95);
+  border-color: #d8c65a;
+  color: #d8c65a;
+  font-weight: 600;
+  box-shadow: 0 0 10px rgba(216, 198, 90, 0.2);
+}
+
+/* ── Bottom Toolbar: Horizontal Pill (Bottom Center) ───────────────────────── */
+.bottomToolbar {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(24, 23, 22, 0.88);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid #414039;
+  border-radius: 8px;
+  padding: 4px 6px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5);
+}
+
+.toolBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: transparent;
+  border: none;
+  color: rgba(240, 238, 231, 0.75);
+  font-family: var(--font-body, system-ui, sans-serif);
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.toolBtn:hover {
+  color: #f0eee7;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.toolBtnActive {
+  color: #d8c65a;
+  background: rgba(216, 198, 90, 0.12);
+}
+
+.toolDivider {
+  width: 1px;
+  height: 16px;
+  background: #414039;
+}
+
+/* Fallback Container */
+.fallbackContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 24px;
+  text-align: center;
+  color: #f0eee7;
+  background: #151514;
+}
+
+.fallbackTitle {
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.fallbackText {
+  font-size: 0.875rem;
+  color: rgba(240, 238, 231, 0.65);
+  max-width: 380px;
+}

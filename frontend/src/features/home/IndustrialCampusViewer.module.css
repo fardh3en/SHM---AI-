@@ -1,0 +1,535 @@
+/* Industrial Campus 3D Digital Twin Viewer — Cinematic Architectural & Monitoring Interface */
+
+.viewerContainer {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 580px;
+  background: #18161A;
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(243, 239, 231, 0.12);
+  overflow: hidden;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55);
+  display: flex;
+  flex-direction: column;
+  user-select: none;
+}
+
+@media (max-width: 1024px) {
+  .viewerContainer {
+    min-height: 500px;
+  }
+}
+
+@media (max-width: 640px) {
+  .viewerContainer {
+    min-height: 420px;
+  }
+}
+
+/* ── Interactive Viewport Area ─────────────────────────────────────── */
+.viewportStage {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  flex: 1;
+  overflow: hidden;
+  cursor: grab;
+  background: #121014;
+}
+
+.viewportStage:active {
+  cursor: grabbing;
+}
+
+.canvasImageLayer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  pointer-events: none;
+  transition: transform 0.15s ease-out;
+  transform-origin: center center;
+}
+
+/* Subtle Vignette & Technical Ambient Lighting */
+.vignetteOverlay {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    circle at 50% 50%,
+    transparent 55%,
+    rgba(16, 14, 18, 0.45) 85%,
+    rgba(14, 12, 16, 0.75) 100%
+  );
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* ── Top-Left Segmented Mode Switcher ──────────────────────────────── */
+.topModeBar {
+  position: absolute;
+  top: 18px;
+  left: 20px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  pointer-events: auto;
+}
+
+.segmentedControl {
+  display: flex;
+  align-items: center;
+  background: rgba(22, 19, 24, 0.88);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(216, 198, 90, 0.3);
+  border-radius: 9999px;
+  padding: 4px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  gap: 2px;
+}
+
+.segmentBtn {
+  background: transparent;
+  border: none;
+  border-radius: 9999px;
+  padding: 6px 14px;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-stone, #B6BDA8);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.segmentBtn:hover {
+  color: #F3EFE7;
+}
+
+.segmentBtnActive {
+  background: var(--color-mineral, #D8C65A) !important;
+  color: #171618 !important;
+  box-shadow: 0 0 12px rgba(216, 198, 90, 0.55);
+}
+
+/* ── Interactive Structural Markers with Vertical Leader Lines ──────── */
+.markersContainer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.markerAnchor {
+  position: absolute;
+  pointer-events: auto;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transform: translate(-50%, -100%);
+  transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.markerAnchor:hover,
+.markerAnchorActive {
+  transform: translate(-50%, -100%) scale(1.05);
+  z-index: 15;
+}
+
+.markerHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Concentric Glow Target */
+.targetDisc {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid var(--color-mineral, #D8C65A);
+  background: rgba(216, 198, 90, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 14px rgba(216, 198, 90, 0.6);
+  transition: all var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.targetDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-mineral, #D8C65A);
+  box-shadow: 0 0 8px var(--color-mineral, #D8C65A);
+}
+
+.markerAnchor:hover .targetDisc,
+.markerAnchorActive .targetDisc {
+  background: rgba(216, 198, 90, 0.45);
+  box-shadow: 0 0 20px rgba(216, 198, 90, 0.9);
+}
+
+/* Label next to target */
+.markerLabelBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.9);
+  white-space: nowrap;
+}
+
+.markerTitle {
+  font-family: var(--font-body);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: #FFFFFF;
+  letter-spacing: -0.01em;
+}
+
+.markerSub {
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  color: rgba(243, 239, 231, 0.7);
+  letter-spacing: 0.02em;
+}
+
+/* Vertical Thin Leader Line */
+.leaderLine {
+  width: 1px;
+  background: linear-gradient(
+    to bottom,
+    rgba(216, 198, 90, 0.85) 0%,
+    rgba(216, 198, 90, 0.3) 70%,
+    rgba(216, 198, 90, 0.1) 100%
+  );
+  box-shadow: 0 0 4px rgba(216, 198, 90, 0.4);
+}
+
+.leaderLineDot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--color-mineral, #D8C65A);
+  box-shadow: 0 0 6px var(--color-mineral, #D8C65A);
+  margin-top: -2px;
+}
+
+/* ── Top-Right Information Panel ───────────────────────────────────── */
+.infoPanel {
+  position: absolute;
+  top: 18px;
+  right: 20px;
+  width: 330px;
+  max-width: calc(100% - 40px);
+  background: rgba(20, 18, 22, 0.92);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(243, 239, 231, 0.16);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  z-index: 25;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
+  pointer-events: auto;
+  animation: panelFadeIn 0.2s ease-out;
+}
+
+@keyframes panelFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.panelHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.panelTitleArea {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.panelTitle {
+  font-family: var(--font-body);
+  font-size: 1rem;
+  font-weight: 700;
+  color: #FFFFFF;
+}
+
+.panelCategory {
+  font-family: var(--font-body);
+  font-size: 0.75rem;
+  color: rgba(243, 239, 231, 0.6);
+}
+
+.statusIndicatorTag {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: #4E9B68;
+}
+
+.statusGreenDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #4E9B68;
+  box-shadow: 0 0 6px #4E9B68;
+}
+
+/* Two-Column Finding Content */
+.panelContentGrid {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: var(--space-3);
+  align-items: center;
+}
+
+.crackPhoto {
+  width: 110px;
+  height: 88px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(243, 239, 231, 0.15);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.statsColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.statRow {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.statLabel {
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  color: rgba(243, 239, 231, 0.55);
+}
+
+.statValue {
+  font-family: var(--font-body);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #F3EFE7;
+}
+
+.statusReviewBadge {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--color-mineral, #D8C65A);
+}
+
+.reviewYellowDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-mineral, #D8C65A);
+  box-shadow: 0 0 6px var(--color-mineral, #D8C65A);
+}
+
+/* View Details Action Button */
+.viewDetailsBtn {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: transparent;
+  border: 1px solid var(--color-mineral, #D8C65A);
+  border-radius: var(--radius-sm);
+  color: var(--color-mineral, #D8C65A);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  margin-top: 2px;
+}
+
+.viewDetailsBtn:hover {
+  background: rgba(216, 198, 90, 0.15);
+  box-shadow: 0 0 12px rgba(216, 198, 90, 0.35);
+  color: #FFF;
+}
+
+/* ── Bottom-Left Viewport Controls ─────────────────────────────────── */
+.bottomLeftControls {
+  position: absolute;
+  bottom: 18px;
+  left: 20px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  pointer-events: auto;
+}
+
+.controlsBar {
+  display: flex;
+  align-items: center;
+  background: rgba(20, 18, 22, 0.88);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(243, 239, 231, 0.14);
+  border-radius: var(--radius-md);
+  padding: 3px 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  gap: 4px;
+}
+
+.ctrlBtn {
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 5px 8px;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  color: rgba(243, 239, 231, 0.85);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  transition: all var(--transition-fast);
+}
+
+.ctrlBtn:hover {
+  color: #FFFFFF;
+  background: rgba(243, 239, 231, 0.1);
+}
+
+.ctrlDivider {
+  width: 1px;
+  height: 14px;
+  background: rgba(243, 239, 231, 0.18);
+  margin: 0 2px;
+}
+
+/* ── Bottom-Right Status Legend ────────────────────────────────────── */
+.bottomRightLegend {
+  position: absolute;
+  bottom: 18px;
+  right: 20px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  pointer-events: auto;
+}
+
+.legendBar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: rgba(20, 18, 22, 0.88);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(243, 239, 231, 0.14);
+  border-radius: var(--radius-md);
+  padding: 6px 14px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.legendItem {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  color: rgba(243, 239, 231, 0.85);
+}
+
+.legendDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.dotMonitored {
+  background: var(--color-mineral, #D8C65A);
+  box-shadow: 0 0 6px var(--color-mineral, #D8C65A);
+}
+
+.dotHealthy {
+  background: #4E9B68;
+  box-shadow: 0 0 6px #4E9B68;
+}
+
+.dotAttention {
+  background: #E08A3C;
+  box-shadow: 0 0 6px #E08A3C;
+}
+
+.dotCritical {
+  background: #E0564A;
+  box-shadow: 0 0 6px #E0564A;
+}
+
+/* Responsive Overrides */
+@media (max-width: 860px) {
+  .infoPanel {
+    position: static;
+    width: 100%;
+    max-width: 100%;
+    margin-top: auto;
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+    border-bottom: none;
+  }
+
+  .topModeBar {
+    top: 12px;
+    left: 12px;
+  }
+
+  .bottomLeftControls {
+    bottom: 12px;
+    left: 12px;
+  }
+
+  .bottomRightLegend {
+    bottom: 12px;
+    right: 12px;
+  }
+
+  .legendBar {
+    gap: 8px;
+    padding: 4px 8px;
+  }
+}

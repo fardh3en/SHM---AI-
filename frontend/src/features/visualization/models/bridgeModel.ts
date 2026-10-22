@@ -11,11 +11,12 @@ export function buildBridgeModel(
   const components = new Map<string, StructuralComponentData>()
 
   const isBrooklyn = asset.name.toLowerCase().includes('brooklyn')
-  const isGGB = asset.name.toLowerCase().includes('golden gate')
 
-  // Find any inspection findings for the asset
-  const latestInspection = inspections.find((i) => i.defect_count > 0)
-  const hasFindings = Boolean(latestInspection)
+  // Find any completed inspection findings for the asset
+  const completedInspections = inspections.filter((i) => i.status === 'completed')
+  const latestCompleted = completedInspections[0]
+  const inspectionWithFindings = completedInspections.find((i) => i.defect_count > 0)
+  const hasFindings = Boolean(inspectionWithFindings)
 
   // Color materials
   const matFindings = new THREE.MeshStandardMaterial({
@@ -56,12 +57,15 @@ export function buildBridgeModel(
   // ── 1. Substructure Piers ─────────────────────────────────────────────────
   const pierPositions = [-12, 0, 12]
   pierPositions.forEach((x, idx) => {
-    const isSplashZonePier = isGGB && idx === 0
-    const pierStatus: ComponentStatus = isSplashZonePier && hasFindings
-      ? 'assessed_findings'
-      : isSplashZonePier
-      ? 'assessed_nominal'
-      : 'not_assessed'
+    const isTargetPier = !isBrooklyn && idx === 0
+    let pierStatus: ComponentStatus = 'not_assessed'
+    if (isTargetPier) {
+      if (hasFindings && inspectionWithFindings) {
+        pierStatus = 'assessed_findings'
+      } else if (completedInspections.length > 0) {
+        pierStatus = 'assessed_nominal'
+      }
+    }
 
     const pierMat = pierStatus === 'assessed_findings'
       ? matFindings
@@ -83,12 +87,14 @@ export function buildBridgeModel(
         status: pierStatus,
         designFunction: 'Carries axial bridge load to bedrock anchorage caisson',
         dimensions: '4.5m × 2.5m × 5.5m',
-        defectSummary: isSplashZonePier && hasFindings
-          ? `${latestInspection?.defect_count} structural defect(s) detected in tidal splash zone.`
+        defectSummary: pierStatus === 'assessed_findings' && inspectionWithFindings
+          ? `${inspectionWithFindings.defect_count} structural defect(s) detected during inspection. Notes: ${inspectionWithFindings.notes || 'Anomalies identified.'}`
           : undefined,
-        findingsCount: isSplashZonePier ? latestInspection?.defect_count : 0,
-        linkedEvidencePaths: isSplashZonePier
-          ? ['/uploads/evidence/ggb_marin_tower_substructure.jpg', '/uploads/evidence/ggb_north_pier_lime_point.jpg']
+        findingsCount: pierStatus === 'assessed_findings' ? inspectionWithFindings?.defect_count : 0,
+        inspectionId: pierStatus === 'assessed_findings' ? inspectionWithFindings?.id : pierStatus === 'assessed_nominal' ? latestCompleted?.id : undefined,
+        inspectionDate: pierStatus === 'assessed_findings' ? inspectionWithFindings?.created_at : pierStatus === 'assessed_nominal' ? latestCompleted?.created_at : undefined,
+        linkedEvidencePaths: pierStatus === 'assessed_findings' && inspectionWithFindings?.input_path
+          ? [inspectionWithFindings.input_path]
           : undefined,
       },
       pierMat
@@ -157,6 +163,14 @@ export function buildBridgeModel(
     const towerGeo = new THREE.BoxGeometry(3.5, archH, 2.5)
     const towerMesh = new THREE.Mesh(towerGeo)
     towerMesh.position.set(0, 9.8, 0)
+
+    let towerStatus: ComponentStatus = 'not_assessed'
+    if (hasFindings && inspectionWithFindings) {
+      towerStatus = 'assessed_findings'
+    } else if (completedInspections.length > 0) {
+      towerStatus = 'assessed_nominal'
+    }
+
     registerMesh(
       towerMesh,
       {
@@ -164,15 +178,20 @@ export function buildBridgeModel(
         name: 'Gothic Masonry Arch Tower',
         type: 'arch_voussoir',
         material: 'Granite ashlar masonry with Rosendale natural cement mortar',
-        status: hasFindings ? 'assessed_findings' : 'assessed_nominal',
+        status: towerStatus,
         designFunction: 'Primary suspension cable saddle support and main span anchor',
         dimensions: '3.5m × 10.0m × 2.5m',
-        linkedEvidencePaths: [
-          '/uploads/evidence/brooklyn_bridge_gothic_arch.jpg',
-          '/uploads/evidence/brooklyn_bridge_tower_masonry_elevation.jpg',
-        ],
+        defectSummary: towerStatus === 'assessed_findings' && inspectionWithFindings
+          ? `${inspectionWithFindings.defect_count} structural defect(s) detected during inspection. Notes: ${inspectionWithFindings.notes || 'Anomalies identified.'}`
+          : undefined,
+        findingsCount: towerStatus === 'assessed_findings' ? inspectionWithFindings?.defect_count : 0,
+        inspectionId: towerStatus === 'assessed_findings' ? inspectionWithFindings?.id : towerStatus === 'assessed_nominal' ? latestCompleted?.id : undefined,
+        inspectionDate: towerStatus === 'assessed_findings' ? inspectionWithFindings?.created_at : towerStatus === 'assessed_nominal' ? latestCompleted?.created_at : undefined,
+        linkedEvidencePaths: towerStatus === 'assessed_findings' && inspectionWithFindings?.input_path
+          ? [inspectionWithFindings.input_path]
+          : undefined,
       },
-      hasFindings ? matFindings : matNominal
+      towerStatus === 'assessed_findings' ? matFindings : towerStatus === 'assessed_nominal' ? matNominal : matConcrete
     )
   } else {
     // Continuous Steel Pratt Truss Superstructure

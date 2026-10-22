@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import type { ModelBuildResult, StructuralComponentData } from './types'
+import type { ModelBuildResult, StructuralComponentData, ComponentStatus } from './types'
 import type { Asset } from '../../../api/assets'
 import type { Inspection } from '../../../api/inspections'
 
@@ -11,8 +11,10 @@ export function buildDamModel(
   const components = new Map<string, StructuralComponentData>()
 
   // Check for completed inspections with findings
-  const latestInspection = inspections.find((i) => i.defect_count > 0)
-  const hasFindings = Boolean(latestInspection)
+  const completedInspections = inspections.filter((i) => i.status === 'completed')
+  const latestCompleted = completedInspections[0]
+  const inspectionWithFindings = completedInspections.find((i) => i.defect_count > 0)
+  const hasFindings = Boolean(inspectionWithFindings)
 
   // Standard engineering materials for Victorian masonry dam / reservoir intake
   const matFindings = new THREE.MeshStandardMaterial({
@@ -67,8 +69,20 @@ export function buildDamModel(
   }
 
   // ── 1. Heavy Masonry Intake Retaining Headwalls ──────────────────────────
-  // North Headwall (Inspected - has findings: mortar deterioration & efflorescence)
-  const northWallMat = hasFindings ? matFindings : matNominal
+  // North Headwall
+  let northWallStatus: ComponentStatus = 'not_assessed'
+  if (hasFindings && inspectionWithFindings) {
+    northWallStatus = 'assessed_findings'
+  } else if (completedInspections.length > 0) {
+    northWallStatus = 'assessed_nominal'
+  }
+
+  const northWallMat = northWallStatus === 'assessed_findings'
+    ? matFindings
+    : northWallStatus === 'assessed_nominal'
+    ? matNominal
+    : matBrickMasonry
+
   const headwallNorthGeo = new THREE.BoxGeometry(10.0, 6.5, 2.2)
   const headwallNorthMesh = new THREE.Mesh(headwallNorthGeo)
   headwallNorthMesh.position.set(-6.5, 3.25, 0)
@@ -79,25 +93,23 @@ export function buildDamModel(
       name: 'North Reservoir Intake Retaining Headwall',
       type: 'retaining_wall',
       material: asset.material || 'Victorian Engineering Brick Masonry with Lime Mortar',
-      status: hasFindings ? 'assessed_findings' : 'assessed_nominal',
+      status: northWallStatus,
       designFunction: 'Primary earth and water retention headwall resisting reservoir hydrostatic surcharge',
       dimensions: '10.0m × 6.5m × 2.2m',
-      defectSummary: hasFindings
-        ? `${latestInspection?.defect_count} defect(s): Mortar joint deterioration on north face; efflorescence visible at seepage points.`
+      defectSummary: northWallStatus === 'assessed_findings' && inspectionWithFindings
+        ? `${inspectionWithFindings.defect_count} structural defect(s) detected during inspection. Notes: ${inspectionWithFindings.notes || 'Anomalies identified.'}`
         : undefined,
-      findingsCount: hasFindings ? latestInspection?.defect_count : 0,
-      linkedEvidencePaths: hasFindings
-        ? [
-            '/uploads/evidence/brixton_reservoir_lambeth_works.jpg',
-            '/uploads/evidence/covered_reservoir_brick_retaining_wall.jpg',
-            '/uploads/evidence/lambeth_waterworks_gate_headwall.jpg',
-          ]
+      findingsCount: northWallStatus === 'assessed_findings' ? inspectionWithFindings?.defect_count : 0,
+      inspectionId: northWallStatus === 'assessed_findings' ? inspectionWithFindings?.id : northWallStatus === 'assessed_nominal' ? latestCompleted?.id : undefined,
+      inspectionDate: northWallStatus === 'assessed_findings' ? inspectionWithFindings?.created_at : northWallStatus === 'assessed_nominal' ? latestCompleted?.created_at : undefined,
+      linkedEvidencePaths: northWallStatus === 'assessed_findings' && inspectionWithFindings?.input_path
+        ? [inspectionWithFindings.input_path]
         : undefined,
     },
     northWallMat
   )
 
-  // South Headwall (Nominal)
+  // South Headwall
   const headwallSouthGeo = new THREE.BoxGeometry(10.0, 6.5, 2.2)
   const headwallSouthMesh = new THREE.Mesh(headwallSouthGeo)
   headwallSouthMesh.position.set(6.5, 3.25, 0)
@@ -108,11 +120,11 @@ export function buildDamModel(
       name: 'South Reservoir Intake Retaining Headwall',
       type: 'retaining_wall',
       material: 'Victorian Engineering Brick Masonry',
-      status: 'assessed_nominal',
+      status: 'not_assessed',
       designFunction: 'Lateral reservoir retention wing wall and intake approach training structure',
       dimensions: '10.0m × 6.5m × 2.2m',
     },
-    matNominal
+    matBrickMasonry
   )
 
   // Ashlar Stone Coping Course (Top perimeter)

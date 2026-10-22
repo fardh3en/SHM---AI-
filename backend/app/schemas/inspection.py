@@ -19,6 +19,10 @@ class InspectionCreate(SHMBaseSchema):
         default=InspectionSource.IMAGE,
         description="Origin of the input media.",
     )
+    input_path: str | None = Field(
+        default=None,
+        description="Optional file path or URL of the input inspection photograph.",
+    )
     notes: str | None = Field(
         default=None,
         description="Optional inspector notes or context.",
@@ -28,7 +32,7 @@ class InspectionCreate(SHMBaseSchema):
 class InspectionUpdate(SHMBaseSchema):
     """
     Request body for PATCH /inspections/{id}.
-    Typically used by the vision engine to populate results after processing.
+    Typically used by operators and the vision engine.
     """
     status: InspectionStatus | None = None
     notes: str | None = None

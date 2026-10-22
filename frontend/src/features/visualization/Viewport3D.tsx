@@ -429,6 +429,12 @@ export default function Viewport3D({
       role="region"
       aria-label={`Interactive 3D model of ${asset.name}`}
     >
+      {/* Viewport Top Disclaimer */}
+      <div className={styles.modelDisclaimerBanner}>
+        <AlertTriangle size={12} color="var(--color-mineral)" />
+        <span>Representative Parametric Model — Geometry is illustrative. Component conditions reflect recorded inspection evidence only.</span>
+      </div>
+
       {/* Top-Left Indicator Badge */}
       <div className={styles.hudBadgeTopLeft}>
         <span className={styles.badgeIconPulse} />

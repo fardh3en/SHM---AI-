@@ -1,7 +1,7 @@
 """
 HealthRecord ORM model.
 
-Stores the output of the Structural Health Intelligence engine (Phase 3).
+Stores the output of the Structural Health Intelligence engine (Phase 3 & Phase 6).
 Generated after each inspection and linked to that inspection.
 """
 from __future__ import annotations
@@ -33,8 +33,9 @@ class HealthRecord(UUIDPrimaryKeyMixin, TimestampedMixin, Base):
     """
     Structural health assessment for a single inspection.
 
-    Produced by the intelligence engine in Phase 3. Stores the aggregated
-    health score, risk classification, and detailed severity breakdown.
+    Produced by the intelligence engine in Phase 3 & 6. Stores the aggregated
+    health score, risk classification, detailed severity breakdown, and
+    provenance metadata.
     """
 
     __tablename__ = "health_records"
@@ -74,6 +75,18 @@ class HealthRecord(UUIDPrimaryKeyMixin, TimestampedMixin, Base):
     notes: Mapped[str | None] = mapped_column(
         Text, nullable=True,
         doc="Engineering notes or analyst comments."
+    )
+    assessment_method: Mapped[str | None] = mapped_column(
+        String(128), nullable=True,
+        doc="Methodology used, e.g. 'SHM-AI Deterministic Rules Engine v1.0'."
+    )
+    service_version: Mapped[str | None] = mapped_column(
+        String(32), nullable=True,
+        doc="Version of the intelligence service that generated this record."
+    )
+    metadata_json: Mapped[dict[str, Any] | None] = mapped_column(
+        JSON, nullable=True,
+        doc="Complete provenance metadata (data sources, limitations, assumptions, calibration)."
     )
 
     # ── Relationship ──────────────────────────────────────────────────────────
