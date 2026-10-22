@@ -1,26 +1,126 @@
-# Dashboard — Phase 6
+# SHM-AI Frontend Workspace
 
-**Status**: 🔜 Not yet implemented. Awaiting Phase 5 approval.
+<div align="center">
 
-## Planned Modules
+### Interactive Structural Health Monitoring Engineering Workspace
+
+[![React](https://img.shields.io/badge/React-18.3.1-61DAFB.svg)](https://react.dev/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.6.3-3178C6.svg)](https://www.typescriptlang.org/)
+[![Vite](https://img.shields.io/badge/Vite-6.0.1-646CFF.svg)](https://vitejs.dev/)
+[![Three.js](https://img.shields.io/badge/Three.js-0.186.1-black.svg)](https://threejs.org/)
+[![Tailwind CSS](https://img.shields.io/badge/TailwindCSS-3.4-38B2AC.svg)](https://tailwindcss.com/)
+
+</div>
+
+---
+
+## Overview
+
+The **SHM-AI Frontend** is a modern single-page application built for structural engineers and infrastructure inspection managers. Designed around high-precision workflows, it combines real-time computer vision review, interactive 3D digital twins, multi-step inspection recording, and automated engineering report generation.
+
+---
+
+## Key Features & Feature Modules
+
+### 1. Interactive 3D Structural Health Digital Twin (`/structural-health`)
+- **Location**: `src/features/visualization/`
+- **Engine**: Three.js with custom OrbitControls and lighting setup.
+- **Parametric Typologies**:
+  - **Bridges**: Girder decks, structural piers, abutment footings, suspension cables.
+  - **Roads / Flyovers**: Elevated multi-span highway decks, columns, barriers.
+  - **Dams**: Curvature arch/gravity wall facades, crest parapets, spillways, intake conduits.
+  - **Tunnels**: Vaulted concrete liners, tunnel portals, invert slabs.
+  - **Buildings**: Multi-bay concrete columns, structural slabs, shear walls.
+  - **Pipelines**: Cylindrical conduit sections, flanges, saddle supports.
+- **Interactivity**: Element raycasting, component selection, defect heatmap projection, and evidence photo linkage.
+
+### 2. Vision Analysis Studio (`/vision`)
+- **Location**: `src/features/vision/`
+- **Functionality**:
+  - Side-by-side inspection viewer (original photographic source vs. localized defect view).
+  - SVG bounding box overlays and translucent segmentation masks.
+  - Defect metrics breakdown (confidence score, length, width, area, and classification).
+  - Defect category filtering (cracks, spalls, corrosion, delamination).
+
+### 3. Inspection Studio (`/inspections`)
+- **Location**: `src/features/inspections/`
+- **Workflow**:
+  - Step 1: Asset selection or registration.
+  - Step 2: Photographic evidence upload or catalog selection.
+  - Step 3: Vision pipeline execution with real-time feedback.
+  - Step 4: Diagnostic Findings card with fallback handling, weight provisioning warnings, and "Attach Evidence & Retry" actions.
+
+### 4. Engineering Reports (`/reports`)
+- **Location**: `src/features/reports/`
+- **Functionality**:
+  - Compilation of official structural health dossiers.
+  - In-browser interactive preview of Jinja2 HTML dossiers.
+  - One-click HTML dossier download and print-ready PDF styling.
+
+### 5. Asset Registry & Details (`/assets` & `/assets/:id`)
+- **Location**: `src/features/assets/`
+- **Functionality**:
+  - Searchable, filterable structural asset inventory.
+  - Detailed asset specifications, structural component breakdowns, and historical inspection timelines.
+
+### 6. Executive Dashboard (`/dashboard`)
+- **Location**: `src/features/dashboard/`
+- **Functionality**:
+  - High-level KPIs: Total assets, active inspections, critical defects, fleet health score.
+  - Condition distribution charts and recent inspection activity streams.
+
+---
+
+## Directory Structure
 
 ```
 frontend/
-└── dashboard/
-    ├── app.py              ← Streamlit app entry point
-    ├── pages/
-    │   ├── 01_assets.py    ← Asset registry + health overview
-    │   ├── 02_inspect.py   ← Run inspection, upload image/video
-    │   ├── 03_gallery.py   ← Defect image gallery with filters
-    │   ├── 04_trends.py    ← Health score trend analysis
-    │   ├── 05_degradation.py ← Degradation forecast charts
-    │   └── 06_reports.py   ← Generate & export PDF reports
-    └── components/
-        ├── health_gauge.py     ← Health score gauge widget
-        ├── defect_map.py       ← Spatial defect heatmap
-        └── timeline.py         ← Inspection timeline chart
+├── src/
+│   ├── api/               # API clients (assets, inspections, vision, reports)
+│   ├── components/        # Shared UI components
+│   │   ├── layout/        # AppShell, Sidebar, Header, Breadcrumbs
+│   │   └── ui/            # Buttons, Badges, Modals, Spinners, Tooltips
+│   ├── features/          # Domain feature pages & logic
+│   │   ├── assets/        # AssetListPage, AssetDetailPage, AssetModal
+│   │   ├── dashboard/     # Dashboard metrics & condition charts
+│   │   ├── home/          # Public landing / entry page
+│   │   ├── inspections/   # InspectionStudioPage, InspectionFindingsCard
+│   │   ├── reports/       # ReportsPage & DossierPreview
+│   │   ├── vision/        # VisionAnalysisPage, DefectOverlayCanvas
+│   │   └── visualization/ # StructuralHealthPage, Three.js 3D viewport & models
+│   ├── hooks/             # Custom React hooks (useAsset, useInspection)
+│   ├── tokens/            # Design tokens (colors, typography, spacing)
+│   ├── App.tsx            # Main application router
+│   ├── index.css          # Global CSS & Tailwind directives
+│   └── main.tsx           # React bootstrap
+├── package.json           # npm dependencies and scripts
+├── tsconfig.json          # TypeScript compiler configuration
+└── vite.config.ts         # Vite bundler configuration & backend API proxy
 ```
 
-## Future
-Phase 6 implements Streamlit as a temporary dashboard.
-A React + TypeScript frontend will replace it in a future phase.
+---
+
+## Development Setup
+
+### 1. Install Dependencies
+```bash
+npm install
+```
+
+### 2. Run Development Server
+```bash
+npm run dev
+```
+The frontend starts on [http://localhost:3000](http://localhost:3000) and automatically proxies `/api/v1` and `/uploads` requests to the FastAPI backend running on port 8000.
+
+### 3. Verification Commands
+```bash
+# Type-check TypeScript codebase
+npm run type-check
+
+# Run ESLint
+npm run lint
+
+# Compile production bundle
+npm run build
+```
