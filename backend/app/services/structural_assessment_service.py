@@ -87,6 +87,7 @@ class StructuralAssessmentService(BaseService):
         self,
         inspection_id: str,
         force_reassess: bool = False,
+        detector: Any | None = None,
     ) -> StructuralAssessmentResponse | None:
         """
         Evaluate structural health for a specific inspection.
@@ -142,16 +143,103 @@ class StructuralAssessmentService(BaseService):
                 notes="Awaiting vision inference completion.",
             )
 
-        # ── 3. Check for existing HealthRecord if not forcing reassessment ────
+        # ── 3. Resolve Active Vision Detector Capabilities ───────────────────
+        if detector is None:
+            try:
+                from backend.app.dependencies import get_cv_pipeline
+                cv_pipe = get_cv_pipeline()
+                detector = getattr(cv_pipe, "detector", getattr(cv_pipe, "_detector", None))
+            except Exception:
+                detector = None
+
+        is_defect_model = getattr(detector, "is_defect_model", True) if detector is not None else True
+        model_name = getattr(detector, "model_name", "yolo11n-seg.pt") if detector is not None else "unknown"
+        supported_classes = getattr(detector, "supported_defect_classes", []) if detector is not None else []
+
+        assessed_date = datetime.datetime.now(datetime.timezone.utc).isoformat()
+
+        # ── 4. Handle Unvalidated Model Weights ────────────────────────────────
+        if not is_defect_model:
+            logger.warning(
+                f"[Integrity Guard] Inspection {inspection_id!r} evaluated with unvalidated model '{model_name}'. "
+                "Returning UNVERIFIED assessment without fake 100/100 score."
+            )
+            if inspection.health_score is not None:
+                await self._inspection_repo.update_fields(inspection, health_score=None)
+            return StructuralAssessmentResponse(
+                status="unverified",
+                asset_id=asset.id,
+                asset_name=asset.name,
+                inspection_id=inspection.id,
+                assessment_date_utc=assessed_date,
+                health_score=None,
+                risk_level=None,
+                model_name=model_name,
+                model_validated=False,
+                detected_defect_count=inspection.defect_count,
+                data_sources=[
+                    f"Vision Model: {model_name} (UNVALIDATED: general COCO object weights, no structural defect classes)",
+                ],
+                assumptions=STANDARD_ASSUMPTIONS,
+                limitations=[
+                    f"Active vision model '{model_name}' has 80 standard COCO classes and is NOT trained on structural defects.",
+                    "Zero detections reflect model domain incompatibility (model blindness), NOT structural integrity.",
+                    "Health score cannot be certified without domain-specific defect segmentation weights (e.g. crack/spall).",
+                ],
+                missing_inputs=[
+                    "Fine-tuned structural defect detection model weights (crack, spall, corrosion) are required.",
+                    "Ground-truth structural inspection validation missing.",
+                ],
+                notes="Assessment unverified: Active vision detector is unvalidated for structural defect detection.",
+            )
+
+        # ── 5. Check for existing HealthRecord if not forcing reassessment ────
         if not force_reassess:
             existing_record = await self._health_repo.get_latest_for_inspection(inspection_id)
             if existing_record is not None:
-                return self._record_to_response(existing_record, asset, inspection)
+                cached_count = (existing_record.metadata_json or {}).get("observation_count", 0)
+                if cached_count > 0:
+                    return self._record_to_response(existing_record, asset, inspection)
 
-        # ── 4. Retrieve Persisted Detections ──────────────────────────────────
+        # ── 6. Retrieve Persisted Detections ──────────────────────────────────
         detections = await self._detection_repo.get_by_inspection(inspection_id)
 
-        # ── 5. Prepare Domain Input ───────────────────────────────────────────
+        # ── 7. Handle Zero Detections on Validated Model ──────────────────────
+        if len(detections) == 0:
+            logger.info(
+                f"[Integrity Guard] Inspection {inspection_id!r} recorded 0 detections with model '{model_name}'. "
+                "Returning UNVERIFIED assessment: 2D image cannot certify 100% asset health."
+            )
+            if inspection.health_score is not None:
+                await self._inspection_repo.update_fields(inspection, health_score=None)
+            return StructuralAssessmentResponse(
+                status="unverified",
+                asset_id=asset.id,
+                asset_name=asset.name,
+                inspection_id=inspection.id,
+                assessment_date_utc=assessed_date,
+                health_score=None,
+                risk_level=None,
+                model_name=model_name,
+                model_validated=True,
+                detected_defect_count=0,
+                data_sources=[
+                    f"Vision Model: {model_name} (Validated classes: {', '.join(supported_classes) if supported_classes else 'structural defects'})",
+                ],
+                assumptions=STANDARD_ASSUMPTIONS,
+                limitations=[
+                    "Zero visual surface defects were detected in this photographic frame.",
+                    "Absence of detected visual surface defects in 2D photographic evidence cannot certify 100% structural integrity; subsurface voiding, internal rebar condition, and uninspected structural members remain unassessed.",
+                    "Automated health score is reported as unverified pending multi-angle sensor survey or certified structural engineering inspection.",
+                ],
+                missing_inputs=[
+                    "Multi-member photographic survey or non-destructive testing (NDT) required for overall asset health certification.",
+                    "Metric camera calibration (Ground Sampling Distance / fiducial) not provided.",
+                ],
+                notes="Assessment unverified: No visual defects observed in the analyzed frame, but comprehensive asset health cannot be certified from zero optical detections alone.",
+            )
+
+        # ── 8. Prepare Domain Input ───────────────────────────────────────────
         observations: list[DefectObservation] = []
         for det in detections:
             cat = DEFECT_TYPE_MAP.get(det.defect_type, DefectCategory.UNKNOWN)
@@ -331,4 +419,7 @@ class StructuralAssessmentService(BaseService):
             severity_breakdown=severity_items,
             failure_modes=failure_items,
             notes=record.notes,
+            model_name=meta.get("model_name"),
+            model_validated=True,
+            detected_defect_count=meta.get("observation_count", len(severity_items)),
         )

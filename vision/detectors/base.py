@@ -66,3 +66,13 @@ class IDetector(ABC):
     def device(self) -> str:
         """Inference device name (e.g., 'cuda' or 'cpu')."""
         pass
+
+    @property
+    def is_defect_model(self) -> bool:
+        """Whether this detector model is validated for structural defect detection."""
+        return True
+
+    @property
+    def supported_defect_classes(self) -> list[str]:
+        """List of supported structural defect class names."""
+        return []

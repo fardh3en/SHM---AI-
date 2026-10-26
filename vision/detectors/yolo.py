@@ -124,6 +124,17 @@ class YOLO11Detector(IDetector):
             logger.info("Bound PyTorch CPU threads to 2 to prevent thread contention on cloud containers.")
 
         logger.info(f"YOLO11 model loaded successfully. Name: {self.model_name}")
+        if not self.is_defect_model:
+            logger.warning(
+                f"[Model Integrity Alert] Loaded weights '{self.model_name}' contain {len(self.model_classes)} classes "
+                f"({list(self.model_classes.values())[:5]}...) but 0 structural defect classes. "
+                "Model is unvalidated for structural crack or concrete spalling detection!"
+            )
+        else:
+            logger.info(
+                f"[Model Integrity Verified] Loaded weights '{self.model_name}' contain {len(self.supported_defect_classes)} "
+                f"structural defect classes: {self.supported_defect_classes}"
+            )
 
     @property
     def model_name(self) -> str:
@@ -132,6 +143,24 @@ class YOLO11Detector(IDetector):
     @property
     def device(self) -> str:
         return self._device
+
+    @property
+    def model_classes(self) -> dict[int, str]:
+        """Class mapping of the underlying YOLO weights."""
+        if hasattr(self, "_model") and hasattr(self._model, "names") and isinstance(self._model.names, dict):
+            return dict(self._model.names)
+        return {}
+
+    @property
+    def supported_defect_classes(self) -> list[str]:
+        """Structural defect classes present in the model's trained classes."""
+        classes = [name.lower() for name in self.model_classes.values()]
+        return [c for c in classes if c in self.CLASS_MAPPING]
+
+    @property
+    def is_defect_model(self) -> bool:
+        """True if the model has at least one structural defect class."""
+        return len(self.supported_defect_classes) > 0
 
     def predict(
         self, image: np.ndarray, confidence_threshold: float | None = None

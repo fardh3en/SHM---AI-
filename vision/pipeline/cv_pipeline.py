@@ -83,6 +83,11 @@ class CVInferencePipeline(IInferencePipeline):
         self._slice_width = slice_width
         self._slice_if_large = slice_if_large
 
+    @property
+    def detector(self) -> IDetector:
+        """The active detector instance."""
+        return self._detector
+
     def run(self, image_path: str | Path) -> list[DetectionResult]:
         """
         Run the full inference pipeline on a single image file.

@@ -35,7 +35,7 @@ class StructuralAssessmentResponse(BaseModel):
     and missing input disclosures.
     """
     status: str = Field(
-        description="Assessment status: 'completed', 'unavailable', or 'insufficient_data'."
+        description="Assessment status: 'completed', 'unavailable', 'insufficient_data', or 'unverified'."
     )
     asset_id: str
     asset_name: str
@@ -82,3 +82,19 @@ class StructuralAssessmentResponse(BaseModel):
     severity_breakdown: list[SeverityBreakdownItem] = Field(default_factory=list)
     failure_modes: list[FailureModeItem] = Field(default_factory=list)
     notes: str | None = None
+    model_name: str | None = Field(
+        default=None,
+        description="Active computer vision model identifier.",
+    )
+    model_validated: bool | None = Field(
+        default=None,
+        description="Whether the active computer vision model has been validated for target structural defect classes.",
+    )
+    detected_defect_count: int = Field(
+        default=0,
+        description="Number of defect instances detected in the photographic evidence.",
+    )
+
+    model_config = {
+        "protected_namespaces": (),
+    }

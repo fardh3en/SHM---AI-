@@ -449,8 +449,11 @@ class InspectionService(BaseService):
                 from backend.app.services.structural_assessment_service import (
                     StructuralAssessmentService,
                 )
+                active_detector = getattr(pipeline, "detector", getattr(pipeline, "_detector", None))
                 assessment_svc = StructuralAssessmentService(self.session)
-                await assessment_svc.assess_inspection(inspection_id, force_reassess=True)
+                await assessment_svc.assess_inspection(
+                    inspection_id, force_reassess=True, detector=active_detector
+                )
                 refreshed = await self._repo.get_by_id(inspection_id)
                 if refreshed is not None:
                     updated = refreshed
