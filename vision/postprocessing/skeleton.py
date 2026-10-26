@@ -44,6 +44,12 @@ class Skeletonizer:
         if not np.any(bool_mask):
             return np.zeros(binary_mask.shape, dtype=np.uint8)
 
+        if not _SKIMAGE_AVAILABLE:
+            raise ImportError(
+                "scikit-image is required for Skeletonizer. "
+                "Install it using pip install -e '.[vision]'"
+            )
+
         # Apply Zhang-Suen or Lee skeletonization algorithm via scikit-image
         skeleton = skeletonize(bool_mask)  # type: ignore[no-untyped-call]
 

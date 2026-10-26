@@ -68,15 +68,32 @@ class YOLO11Detector(IDetector):
 
         # ── Verify weights exist locally (prevent unconsented large auto-downloads) ──
         if not self._model_path.is_file():
-            raise ModelNotFoundError(
-                str(self._model_path),
-                instruction=(
-                    f"Configured YOLO segmentation model weights '{self._model_path.name}' were not found at '{self._model_path}'. "
+            # If the missing weights are the default lightweight nano model (~6MB),
+            # attempt automatic download as a self-healing fallback before failing
+            if self._model_path.name == "yolo11n-seg.pt":
+                logger.info(
+                    f"Default weights '{self._model_path.name}' missing at '{self._model_path}'. "
+                    "Attempting automatic download of base model weights (~6 MB)..."
+                )
+                try:
+                    from scripts.download_weights import download_weights
+                    download_weights(model_name=self._model_path.name, assume_yes=True)
+                except Exception as dl_err:
+                    logger.warning(f"Auto-provisioning default weights failed: {dl_err}")
+
+            if not self._model_path.is_file():
+                parent_dir = self._model_path.parent
+                instruction_msg = (
+                    f"Configured YOLO segmentation weights '{self._model_path.name}' "
+                    f"were not found at '{self._model_path}'. "
                     "Automatic download is disabled to prevent unconsented large file transfers. "
-                    f"To provision the model, run 'python scripts/download_weights.py' or download '{self._model_path.name}' "
-                    f"manually and place it in '{self._model_path.parent}/'."
-                ),
-            )
+                    f"To provision the model, run 'python scripts/download_weights.py' "
+                    f"or download '{self._model_path.name}' and place it in '{parent_dir}/'."
+                )
+                raise ModelNotFoundError(
+                    str(self._model_path),
+                    instruction=instruction_msg,
+                )
 
         # ── Hardware Auto-Detection ───────────────────────────────────────────
         if device == "auto":

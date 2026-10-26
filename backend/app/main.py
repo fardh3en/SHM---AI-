@@ -36,13 +36,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """
     logger.info("Initializing SHM-AI Platform backend service...")
 
+    # Ensure essential runtime directories exist across all environments
+    os.makedirs(settings.BASE_DIR / "data", exist_ok=True)
+    os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
+    os.makedirs(settings.UPLOAD_DIR / "evidence", exist_ok=True)
+    os.makedirs(settings.WEIGHTS_DIR, exist_ok=True)
+
     # Development auto-tables. (In production, use Alembic migrations instead)
     if not settings.is_production:
-        # Ensure data and uploads directories exist
-        os.makedirs(settings.BASE_DIR / "data", exist_ok=True)
-        os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
-        os.makedirs(settings.UPLOAD_DIR / "evidence", exist_ok=True)
-        
         await create_db_and_tables()
 
     yield
