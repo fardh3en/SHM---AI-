@@ -207,3 +207,78 @@ async def test_run_inspection_retry_recovery_after_failure(db_session, tmp_path)
     assert recovered.status == InspectionStatus.COMPLETED
     assert recovered.defect_count == 1
     assert recovered.error_message is None
+
+
+@pytest.mark.asyncio
+async def test_run_inspection_pipeline_error_marks_failed(db_session, tmp_path):
+    """If pipeline.run throws an exception, the inspection is cleanly marked FAILED."""
+    import cv2
+    import numpy as np
+
+    img_file = tmp_path / "broken_test.jpg"
+    cv2.imwrite(str(img_file), np.zeros((200, 200, 3), dtype=np.uint8))
+
+    asset = Asset(name="Fault Test Bridge", asset_type=AssetType.BRIDGE, status=AssetStatus.ACTIVE)
+    db_session.add(asset)
+    await db_session.flush()
+
+    insp = Inspection(
+        asset_id=asset.id,
+        status=InspectionStatus.PENDING,
+        source=InspectionSource.IMAGE,
+        input_path=str(img_file),
+    )
+    db_session.add(insp)
+    await db_session.commit()
+
+    class FaultyPipeline:
+        def run(self, path):
+            raise RuntimeError("PyTorch tensor allocation crash during inference")
+
+    service = InspectionService(db_session)
+    result = await service.run_inspection(insp.id, pipeline=FaultyPipeline())
+
+    assert result.status == InspectionStatus.FAILED
+    assert "PyTorch tensor allocation crash" in result.error_message
+
+    # Ensure DB record is also updated
+    in_db = await service.get_inspection(insp.id)
+    assert in_db.status == InspectionStatus.FAILED
+    assert in_db.error_message == result.error_message
+
+
+@pytest.mark.asyncio
+async def test_run_inspection_persistence_error_marks_failed(db_session, tmp_path):
+    """If database persistence or assessment fails, the inspection is updated to FAILED rather than left in PROCESSING."""
+    import cv2
+    import numpy as np
+
+    img_file = tmp_path / "persist_fault_test.jpg"
+    cv2.imwrite(str(img_file), np.zeros((200, 200, 3), dtype=np.uint8))
+
+    asset = Asset(name="Persist Fault Bridge", asset_type=AssetType.BRIDGE, status=AssetStatus.ACTIVE)
+    db_session.add(asset)
+    await db_session.flush()
+
+    insp = Inspection(
+        asset_id=asset.id,
+        status=InspectionStatus.PENDING,
+        source=InspectionSource.IMAGE,
+        input_path=str(img_file),
+    )
+    db_session.add(insp)
+    await db_session.commit()
+
+    service = InspectionService(db_session)
+    mock_pipeline = CVInferencePipeline(detector=DummyDetector(), slice_if_large=False)
+
+    # Patch detection repo bulk_create to simulate database error
+    with patch.object(service._detection_repo, "bulk_create", side_effect=Exception("Database lock error on insert")):
+        result = await service.run_inspection(insp.id, pipeline=mock_pipeline)
+
+    assert result.status == InspectionStatus.FAILED
+    assert "Database lock error" in result.error_message
+
+    in_db = await service.get_inspection(insp.id)
+    assert in_db.status == InspectionStatus.FAILED
+    assert "Database lock error" in in_db.error_message

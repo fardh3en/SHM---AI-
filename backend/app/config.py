@@ -121,6 +121,14 @@ class Settings(BaseSettings):
     SLICE_HEIGHT: int = Field(default=640, ge=64)
     SLICE_WIDTH: int = Field(default=640, ge=64)
     SLICE_OVERLAP_RATIO: float = Field(default=0.4, ge=0.0, lt=1.0)
+    SLICE_IF_LARGE: bool = Field(
+        default=False,
+        description=(
+            "Whether to slice images into overlapping tiles. Defaults to False for "
+            "responsive cloud CPU inference (single forward pass); set to True for "
+            "ultra-high-resolution orthomosaic analysis."
+        ),
+    )
 
     # ── Logging ────────────────────────────────────────────────────────────────
     LOG_LEVEL: str = Field(

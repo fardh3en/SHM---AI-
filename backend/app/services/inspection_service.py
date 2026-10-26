@@ -8,6 +8,7 @@ Orchestrates inspection lifecycle:
 - Automated structural health assessment execution (Phase 3 & 6)
 - Querying by asset or status
 """
+import asyncio
 import logging
 import time
 from pathlib import Path
@@ -315,6 +316,12 @@ class InspectionService(BaseService):
             )
             raise ValidationError(msg)
 
+        evidence_size_kb = resolved_path.stat().st_size / 1024
+        logger.info(
+            f"[Stage 1: Evidence Verified] inspection_id={inspection_id!r} "
+            f"file='{resolved_path.name}' size={evidence_size_kb:.1f}KB"
+        )
+
         if inspection.status in (InspectionStatus.PROCESSING, InspectionStatus.COMPLETED):
             raise ValidationError(
                 f"Inspection '{inspection_id}' is already "
@@ -326,6 +333,10 @@ class InspectionService(BaseService):
             from backend.app.dependencies import get_cv_pipeline
             try:
                 pipeline = get_cv_pipeline()
+                logger.info(
+                    f"[Stage 2: Pipeline Resolved] inspection_id={inspection_id!r} "
+                    f"detector={getattr(pipeline, '_detector', 'unknown')}"
+                )
             except (ModelNotFoundError, InferenceError) as exc:
                 logger.error(f"Vision model resolution failed for {inspection_id!r}: {exc}", exc_info=True)
                 await self._repo.update_fields(
@@ -348,12 +359,22 @@ class InspectionService(BaseService):
         inspection = await self._repo.update_fields(
             inspection, status=InspectionStatus.PROCESSING, error_message=None
         )
-        logger.info(f"Inspection processing started: id={inspection_id!r}")
+        logger.info(f"[Stage 3: Status Updated] Inspection marked as PROCESSING: id={inspection_id!r}")
 
         start_time = time.perf_counter()
 
+        # Execute CPU-intensive computer vision pipeline in worker thread to prevent event loop starvation
         try:
-            detection_results = pipeline.run(resolved_path)
+            logger.info(
+                f"[Stage 4: Vision Inference Dispatch] Offloading pipeline.run to thread worker for {resolved_path.name}..."
+            )
+            t_infer_start = time.perf_counter()
+            detection_results = await asyncio.to_thread(pipeline.run, resolved_path)
+            infer_ms = (time.perf_counter() - t_infer_start) * 1000
+            logger.info(
+                f"[Stage 4: Vision Inference Complete] id={inspection_id!r} in {infer_ms:.1f}ms: "
+                f"{len(detection_results)} detection(s) found"
+            )
         except (InferenceError, ModelNotFoundError) as exc:
             elapsed_ms = (time.perf_counter() - start_time) * 1000
             err_msg = exc.message if hasattr(exc, "message") else str(exc)
@@ -366,7 +387,7 @@ class InspectionService(BaseService):
             )
         except Exception as exc:  # noqa: BLE001
             elapsed_ms = (time.perf_counter() - start_time) * 1000
-            logger.exception(f"Unexpected error during inspection processing: id={inspection_id!r}")
+            logger.exception(f"Unexpected error during vision pipeline execution: id={inspection_id!r}")
             return await self._repo.update_fields(
                 inspection,
                 status=InspectionStatus.FAILED,
@@ -376,57 +397,85 @@ class InspectionService(BaseService):
 
         elapsed_ms = (time.perf_counter() - start_time) * 1000
 
-        # ── 4. Persist Detection rows ─────────────────────────────────────────
-        if detection_results:
-            records = [
-                {
-                    "inspection_id": inspection_id,
-                    "defect_type": result.defect_type,
-                    "confidence": result.confidence,
-                    "bbox_x1": result.bbox_x1,
-                    "bbox_y1": result.bbox_y1,
-                    "bbox_x2": result.bbox_x2,
-                    "bbox_y2": result.bbox_y2,
-                    "tile_x": result.tile_x,
-                    "tile_y": result.tile_y,
-                    "source_image": inspection.input_path,
-                    "area_px": result.measurements.area_px,
-                    "length_px": result.measurements.length_px,
-                    "width_px": result.measurements.width_px,
-                    "orientation_deg": result.measurements.orientation_deg,
-                    "mask_polygon": result.mask_polygon,
-                }
-                for result in detection_results
-            ]
-            await self._detection_repo.bulk_create(records)
-
-        # ── 5. Mark as completed ──────────────────────────────────────────────
-        updated = await self._repo.update_fields(
-            inspection,
-            status=InspectionStatus.COMPLETED,
-            defect_count=len(detection_results),
-            processing_time_ms=elapsed_ms,
-        )
-
-        # ── 6. Automated Structural Health Assessment ─────────────────────────
+        # Execute persistence and structural assessment with safety wrapper
         try:
-            from backend.app.services.structural_assessment_service import (
-                StructuralAssessmentService,
-            )
-            assessment_svc = StructuralAssessmentService(self.session)
-            await assessment_svc.assess_inspection(inspection_id, force_reassess=True)
-            refreshed = await self._repo.get_by_id(inspection_id)
-            if refreshed is not None:
-                updated = refreshed
-        except Exception as exc:  # noqa: BLE001
-            logger.warning(
-                f"Automated health assessment failed for inspection {inspection_id!r}: {exc}",
-                exc_info=True,
-            )
+            # ── 5. Persist Detection rows ─────────────────────────────────────────
+            if detection_results:
+                t_persist = time.perf_counter()
+                logger.info(
+                    f"[Stage 5: Persisting Detections] Writing {len(detection_results)} detection(s) "
+                    f"to database for inspection {inspection_id!r}..."
+                )
+                records = [
+                    {
+                        "inspection_id": inspection_id,
+                        "defect_type": result.defect_type,
+                        "confidence": result.confidence,
+                        "bbox_x1": result.bbox_x1,
+                        "bbox_y1": result.bbox_y1,
+                        "bbox_x2": result.bbox_x2,
+                        "bbox_y2": result.bbox_y2,
+                        "tile_x": result.tile_x,
+                        "tile_y": result.tile_y,
+                        "source_image": inspection.input_path,
+                        "area_px": result.measurements.area_px,
+                        "length_px": result.measurements.length_px,
+                        "width_px": result.measurements.width_px,
+                        "orientation_deg": result.measurements.orientation_deg,
+                        "mask_polygon": result.mask_polygon,
+                    }
+                    for result in detection_results
+                ]
+                await self._detection_repo.bulk_create(records)
+                persist_ms = (time.perf_counter() - t_persist) * 1000
+                logger.info(f"[Stage 5: Persist Complete] Saved in {persist_ms:.1f}ms for inspection {inspection_id!r}")
 
-        logger.info(
-            f"Inspection processing completed: id={inspection_id!r} "
-            f"defects={len(detection_results)} time={elapsed_ms:.1f}ms "
-            f"health_score={updated.health_score}"
-        )
-        return updated
+            # ── 6. Mark as completed ──────────────────────────────────────────────
+            updated = await self._repo.update_fields(
+                inspection,
+                status=InspectionStatus.COMPLETED,
+                defect_count=len(detection_results),
+                processing_time_ms=elapsed_ms,
+            )
+            logger.info(f"[Stage 6: Status Completed] Inspection marked as COMPLETED: id={inspection_id!r}")
+
+            # ── 7. Automated Structural Health Assessment ─────────────────────────
+            try:
+                t_assess = time.perf_counter()
+                logger.info(f"[Stage 7: Structural Assessment] Calculating health score for {inspection_id!r}...")
+                from backend.app.services.structural_assessment_service import (
+                    StructuralAssessmentService,
+                )
+                assessment_svc = StructuralAssessmentService(self.session)
+                await assessment_svc.assess_inspection(inspection_id, force_reassess=True)
+                refreshed = await self._repo.get_by_id(inspection_id)
+                if refreshed is not None:
+                    updated = refreshed
+                assess_ms = (time.perf_counter() - t_assess) * 1000
+                logger.info(
+                    f"[Stage 7: Structural Assessment Complete] Computed in {assess_ms:.1f}ms for {inspection_id!r}: "
+                    f"health_score={updated.health_score}"
+                )
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(
+                    f"Automated health assessment failed for inspection {inspection_id!r}: {exc}",
+                    exc_info=True,
+                )
+
+            total_ms = (time.perf_counter() - start_time) * 1000
+            logger.info(
+                f"[Pipeline Fully Finalized] id={inspection_id!r} "
+                f"defects={len(detection_results)} total_time={total_ms:.1f}ms "
+                f"health_score={updated.health_score}"
+            )
+            return updated
+        except Exception as post_exc:  # noqa: BLE001
+            total_elapsed_ms = (time.perf_counter() - start_time) * 1000
+            err_msg = f"Database/assessment error during inspection finalization: {post_exc}"
+            logger.error(f"Failed to finalize inspection {inspection_id!r}: {post_exc}", exc_info=True)
+            return await self._repo.update_fields(
+                inspection,
+                status=InspectionStatus.FAILED,
+                error_message=err_msg,
+                processing_time_ms=total_elapsed_ms,
+            )

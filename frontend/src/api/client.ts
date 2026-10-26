@@ -42,8 +42,16 @@ export class ApiError extends Error {
   }
 }
 
+const DEFAULT_REQUEST_TIMEOUT_MS = 90_000 // 90-second timeout prevents UI locking on stalled requests
+
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const url = `${API_BASE}${path}`
+
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), DEFAULT_REQUEST_TIMEOUT_MS)
+  if (init?.signal) {
+    init.signal.addEventListener('abort', () => controller.abort())
+  }
 
   let response: Response
   try {
@@ -54,9 +62,19 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
         ...(init?.headers ?? {}),
       },
       ...init,
+      signal: controller.signal,
     })
-  } catch {
+  } catch (err: unknown) {
+    if (controller.signal.aborted || (err instanceof Error && err.name === 'AbortError')) {
+      throw new ApiError(
+        408,
+        'Request timed out. The server took longer than 90 seconds to complete processing or is unresponsive.',
+        'TIMEOUT_ERROR'
+      )
+    }
     throw new ApiError(0, 'Network error — is the backend running?', 'NETWORK_ERROR')
+  } finally {
+    clearTimeout(timeoutId)
   }
 
   if (!response.ok) {
@@ -101,6 +119,9 @@ export const apiDelete = <T>(path: string) =>
 export async function apiUpload<T>(path: string, formData: FormData): Promise<T> {
   const url = `${API_BASE}${path}`
 
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), DEFAULT_REQUEST_TIMEOUT_MS)
+
   let response: Response
   try {
     response = await fetch(url, {
@@ -109,9 +130,19 @@ export async function apiUpload<T>(path: string, formData: FormData): Promise<T>
         Accept: 'application/json',
       },
       body: formData,
+      signal: controller.signal,
     })
-  } catch {
+  } catch (err: unknown) {
+    if (controller.signal.aborted || (err instanceof Error && err.name === 'AbortError')) {
+      throw new ApiError(
+        408,
+        'Evidence upload timed out. The server took longer than 90 seconds to receive the image.',
+        'TIMEOUT_ERROR'
+      )
+    }
     throw new ApiError(0, 'Network error — is the backend running?', 'NETWORK_ERROR')
+  } finally {
+    clearTimeout(timeoutId)
   }
 
   if (!response.ok) {

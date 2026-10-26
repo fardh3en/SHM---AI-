@@ -3,6 +3,7 @@ Ultralytics YOLO11 implementation of the IDetector interface.
 """
 import logging
 from pathlib import Path
+import time
 from typing import Any, cast
 
 import numpy as np
@@ -116,6 +117,12 @@ class YOLO11Detector(IDetector):
         
         # Move model to target device
         self._model.to(self._device)
+
+        # Optimize CPU thread allocation to prevent thread contention on throttled cloud containers
+        if self._device == "cpu" and torch.get_num_threads() > 2:
+            torch.set_num_threads(2)
+            logger.info("Bound PyTorch CPU threads to 2 to prevent thread contention on cloud containers.")
+
         logger.info(f"YOLO11 model loaded successfully. Name: {self.model_name}")
 
     @property
@@ -138,6 +145,13 @@ class YOLO11Detector(IDetector):
         if len(image.shape) != 3 or image.shape[2] != 3:
             raise ValueError(f"Input image must be RGB with shape [H, W, 3], got {image.shape}")
 
+        t0 = time.perf_counter()
+        threads = torch.get_num_threads() if _ULTRALYTICS_AVAILABLE else "N/A"
+        logger.info(
+            f"YOLO inference starting: shape={image.shape}, conf={conf}, "
+            f"iou={self._default_iou}, device={self._device}, threads={threads}"
+        )
+
         raw_results = self._model.predict(
             source=image,
             conf=conf,
@@ -146,12 +160,22 @@ class YOLO11Detector(IDetector):
             verbose=False,
         )
 
+        infer_ms = (time.perf_counter() - t0) * 1000
+
         if not raw_results:
+            logger.info(f"YOLO inference completed in {infer_ms:.1f}ms: 0 raw results returned")
             return []
 
         results_list = cast("list[Any]", raw_results)
         result = results_list[0]  # Single image inference
         detections: list[RawDetection] = []
+
+        box_count = len(result.boxes) if result and result.boxes is not None else 0
+        mask_count = len(result.masks) if result and result.masks is not None else 0
+        logger.info(
+            f"YOLO forward pass finished in {infer_ms:.1f}ms: "
+            f"{box_count} box(es), {mask_count} mask(s) found"
+        )
 
         # Ensure bounding boxes are present
         if result.boxes is None:

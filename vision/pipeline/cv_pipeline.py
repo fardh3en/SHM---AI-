@@ -91,6 +91,7 @@ class CVInferencePipeline(IInferencePipeline):
         """
         start_time = time.perf_counter()
         path = Path(image_path)
+        logger.info(f"[Vision Pipeline] Starting pipeline for image: {path.name} ({path})")
 
         try:
             image = ImageLoader.load_image(path)
@@ -99,9 +100,15 @@ class CVInferencePipeline(IInferencePipeline):
         except ValueError as exc:
             raise InferenceError(f"Image file could not be decoded: {path}") from exc
 
+        load_ms = (time.perf_counter() - start_time) * 1000
         h_img, w_img = image.shape[:2]
         needs_slicing = self._slice_if_large and (
             h_img > self._slice_height or w_img > self._slice_width
+        )
+        logger.info(
+            f"[Vision Pipeline] Image ready: {path.name} ({w_img}x{h_img} px, loaded in {load_ms:.1f}ms). "
+            f"Slicing policy: needs_slicing={needs_slicing} (slice_if_large={self._slice_if_large}, "
+            f"tile_bounds={self._slice_width}x{self._slice_height})"
         )
 
         try:
@@ -112,14 +119,15 @@ class CVInferencePipeline(IInferencePipeline):
         except InferenceError:
             raise
         except Exception as exc:  # noqa: BLE001 — convert any unexpected failure
+            logger.exception(f"[Vision Pipeline] Unhandled exception processing '{path.name}': {exc}")
             raise InferenceError(
                 f"Vision pipeline failed while processing '{path.name}': {exc}"
             ) from exc
 
         elapsed_ms = (time.perf_counter() - start_time) * 1000
         logger.info(
-            f"Pipeline completed for {path.name}: "
-            f"{len(results)} detection(s) in {elapsed_ms:.1f}ms "
+            f"[Vision Pipeline] Completed for {path.name}: "
+            f"{len(results)} detection(s) extracted in {elapsed_ms:.1f}ms "
             f"(sliced={needs_slicing})"
         )
         return results
@@ -128,22 +136,50 @@ class CVInferencePipeline(IInferencePipeline):
         self, image: np.ndarray, img_width: int, img_height: int
     ) -> list[DetectionResult]:
         """Run inference on the whole image as a single frame (no tiling)."""
+        t0 = time.perf_counter()
+        logger.info(f"[Vision Pipeline: Full-Frame] Invoking detector on full {img_width}x{img_height} frame...")
         raw_detections = self._detector.predict(image)
-        return [
+        predict_ms = (time.perf_counter() - t0) * 1000
+        logger.info(
+            f"[Vision Pipeline: Full-Frame] Detector returned {len(raw_detections)} raw detection(s) in {predict_ms:.1f}ms. "
+            "Extracting morphological measurements and polygons..."
+        )
+        t_measure = time.perf_counter()
+        built = [
             self._build_detection_result(
                 raw, tile_x=None, tile_y=None, img_width=img_width, img_height=img_height
             )
             for raw in raw_detections
         ]
+        measure_ms = (time.perf_counter() - t_measure) * 1000
+        logger.info(f"[Vision Pipeline: Full-Frame] Measurements extracted in {measure_ms:.1f}ms")
+        return built
 
     def _run_sliced(
         self, image: np.ndarray, img_width: int, img_height: int
     ) -> list[DetectionResult]:
         """Run inference tile-by-tile and project results back to full-image space."""
+        tiles = list(self._slicer.slice_image(image))
+        total_tiles = len(tiles)
+        logger.info(
+            f"[Vision Pipeline: Sliced] Slicing generated {total_tiles} tile(s) "
+            f"({self._slice_width}x{self._slice_height}, overlap={self._slicer.overlap_ratio}). "
+            "Processing sequentially..."
+        )
         results: list[DetectionResult] = []
 
-        for tile in self._slicer.slice_image(image):
+        for idx, tile in enumerate(tiles):
+            t_tile = time.perf_counter()
+            logger.info(
+                f"[Vision Pipeline: Sliced] [Tile {idx + 1}/{total_tiles}] "
+                f"offset=({tile.x_offset}, {tile.y_offset}), shape={tile.image.shape} starting predict..."
+            )
             raw_detections = self._detector.predict(tile.image)
+            tile_predict_ms = (time.perf_counter() - t_tile) * 1000
+            logger.info(
+                f"[Vision Pipeline: Sliced] [Tile {idx + 1}/{total_tiles}] "
+                f"predicted in {tile_predict_ms:.1f}ms: found {len(raw_detections)} detection(s)"
+            )
 
             for raw in raw_detections:
                 results.append(
@@ -156,6 +192,10 @@ class CVInferencePipeline(IInferencePipeline):
                     )
                 )
 
+        logger.info(
+            f"[Vision Pipeline: Sliced] Completed all {total_tiles} tile(s). "
+            f"Total raw detections accumulated: {len(results)}"
+        )
         return results
 
     def _build_detection_result(

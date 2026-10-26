@@ -87,6 +87,7 @@ def get_cv_pipeline() -> "CVInferencePipeline":  # noqa: F821 — forward ref, i
         slice_height=settings.SLICE_HEIGHT,
         slice_width=settings.SLICE_WIDTH,
         slice_overlap_ratio=settings.SLICE_OVERLAP_RATIO,
+        slice_if_large=settings.SLICE_IF_LARGE,
     )
 
 
