@@ -19,6 +19,7 @@ import {
   AlertTriangle,
   Info,
   ShieldCheck,
+  UploadCloud,
 } from 'lucide-react'
 import styles from './VisionAnalysisPage.module.css'
 
@@ -179,6 +180,21 @@ export default function VisionAnalysisPage() {
 
           <div className={styles.headerMetaActions}>
             <StatusChip status={selectedInspection.status} size="md" />
+
+            <Link
+              to="/inspections"
+              className={styles.runButton}
+              style={{
+                background: 'var(--color-mineral)',
+                color: '#111413',
+                border: 'none',
+                fontWeight: 600,
+              }}
+              title="Upload new crack photograph to inspect"
+            >
+              <UploadCloud size={14} />
+              <span>Upload Crack Image</span>
+            </Link>
 
             {selectedInspection.status !== 'completed' && selectedInspection.input_path && (
               <button

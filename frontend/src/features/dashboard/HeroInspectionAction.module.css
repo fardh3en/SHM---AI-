@@ -1,0 +1,155 @@
+.heroCard {
+  background: linear-gradient(135deg, rgba(30, 37, 34, 0.95) 0%, rgba(20, 24, 22, 0.98) 100%);
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+  position: relative;
+  overflow: hidden;
+}
+
+.heroCard::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--color-mineral) 0%, var(--color-sage) 50%, transparent 100%);
+}
+
+.topRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.titleArea {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 640px;
+}
+
+.badgeRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 2px;
+}
+
+.mainBadge {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  background: rgba(182, 189, 168, 0.15);
+  color: var(--color-mineral);
+  border: 1px solid rgba(182, 189, 168, 0.35);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.activeIndicator {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-sage);
+  display: inline-block;
+  box-shadow: 0 0 8px var(--color-sage);
+}
+
+.heading {
+  font-family: var(--font-body);
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+}
+
+.description {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  line-height: var(--leading-relaxed);
+}
+
+.actionsGroup {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.dropzoneArea {
+  border: 1.5px dashed var(--border-medium);
+  border-radius: var(--radius-md);
+  background: rgba(0, 0, 0, 0.2);
+  padding: var(--space-5) var(--space-4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: var(--space-4);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  position: relative;
+}
+
+.dropzoneArea:hover {
+  border-color: var(--color-mineral);
+  background: rgba(182, 189, 168, 0.04);
+}
+
+.dropzoneActive {
+  border-color: var(--color-sage);
+  background: rgba(163, 230, 53, 0.08);
+}
+
+.dropzoneIconWrap {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-mineral);
+  flex-shrink: 0;
+}
+
+.dropzoneText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: left;
+}
+
+.dropzoneTitle {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.dropzoneSub {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.hiddenInput {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+  width: 100%;
+  height: 100%;
+}

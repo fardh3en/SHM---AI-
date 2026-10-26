@@ -140,7 +140,10 @@ async def get_inspection(
         "Partially update an inspection. "
         "Used by operators to attach evidence, add notes, or correct status."
     ),
-    responses={404: {"description": "Inspection not found"}},
+    responses={
+        400: {"description": "Validation error"},
+        404: {"description": "Inspection not found"},
+    },
 )
 async def update_inspection(
     inspection_id: str,
@@ -148,7 +151,13 @@ async def update_inspection(
     service: InspectionServiceDep,
 ) -> InspectionResponse:
     """Partial update of an inspection."""
-    inspection = await service.update_inspection(inspection_id, data)
+    try:
+        inspection = await service.update_inspection(inspection_id, data)
+    except ValidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=exc.message if hasattr(exc, "message") else str(exc),
+        ) from exc
     if inspection is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

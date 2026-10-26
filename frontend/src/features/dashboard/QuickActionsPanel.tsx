@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 import {
+  UploadCloud,
   Layers,
-  ClipboardList,
   Box,
   ScanLine,
   FileText,
@@ -16,21 +16,23 @@ interface ActionItem {
   description: string
   href: string
   available: boolean
+  isPrimary?: boolean
 }
 
 const ACTIONS: ActionItem[] = [
   {
-    icon: Layers,
-    label: 'Asset Registry',
-    description: 'Register and manage monitored structures.',
-    href: '/assets',
+    icon: UploadCloud,
+    label: 'Start Image Inspection',
+    description: 'Upload crack photographs directly for AI detection.',
+    href: '/inspections',
     available: true,
+    isPrimary: true,
   },
   {
-    icon: ClipboardList,
-    label: 'Run Inspection',
-    description: 'Submit images to the vision pipeline.',
-    href: '/inspections',
+    icon: Layers,
+    label: 'Asset Registry',
+    description: 'Register and manage monitored civil structures.',
+    href: '/assets',
     available: true,
   },
   {

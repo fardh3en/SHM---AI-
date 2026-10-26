@@ -14,6 +14,8 @@ import {
   Activity,
   Layers,
   UploadCloud,
+  ScanLine,
+  BookmarkCheck,
 } from 'lucide-react'
 import StatusChip from '../../components/ui/StatusChip'
 import Button from '../../components/ui/Button'
@@ -28,6 +30,8 @@ interface InspectionFindingsCardProps {
   onRunVision?: () => Promise<void>
   isRunningVision?: boolean
   onRetryWithEvidence?: () => void
+  onReassignAsset?: (targetAssetId: string) => Promise<void>
+  availableAssets?: Asset[]
 }
 
 function formatDate(iso: string): string {
@@ -52,13 +56,33 @@ export default function InspectionFindingsCard({
   onRunVision,
   isRunningVision = false,
   onRetryWithEvidence,
+  onReassignAsset,
+  availableAssets = [],
 }: InspectionFindingsCardProps) {
   const [copiedId, setCopiedId] = useState(false)
+  const [showReassign, setShowReassign] = useState(false)
+  const [selectedTargetAssetId, setSelectedTargetAssetId] = useState<string>('')
+  const [isReassigning, setIsReassigning] = useState(false)
+  const [reassignSuccess, setReassignSuccess] = useState<string | null>(null)
 
   const handleCopyId = () => {
     navigator.clipboard.writeText(inspection.id)
     setCopiedId(true)
     setTimeout(() => setCopiedId(false), 2000)
+  }
+
+  const handleExecuteReassign = async () => {
+    if (!selectedTargetAssetId || !onReassignAsset) return
+    setIsReassigning(true)
+    try {
+      await onReassignAsset(selectedTargetAssetId)
+      setReassignSuccess('Successfully associated inspection with target asset.')
+      setShowReassign(false)
+    } catch {
+      // Handled by parent
+    } finally {
+      setIsReassigning(false)
+    }
   }
 
   const isFailed = inspection.status === 'failed'
@@ -287,14 +311,56 @@ export default function InspectionFindingsCard({
 
         {/* Transparent Capability Note */}
         <div className={styles.transparentNotice}>
-          <div className={styles.transparentTitle}>Engineering Telemetry Assurance</div>
+          <div className={styles.transparentTitle}>Engineering Telemetry Assurance &amp; Calibration Disclosure</div>
           <div className={styles.transparentDesc}>
-            All metrics, status indicators, and counts rendered in this workspace originate directly
-            from the FastAPI endpoints (<code>/api/v1/inspections/*</code>). Confidence intervals,
-            defect geometry polygons, and automated severity ratings are only displayed when
-            produced by the validated backend segmentation model.
+            All metrics, status indicators, and defect counts originate directly from the FastAPI
+            endpoints (<code>/api/v1/inspections/*</code>). Defect pixel areas and bounding geometries
+            are derived from raw image sensor coordinates. Real-world metric dimensions (mm) require
+            camera focal distance calibration.
           </div>
         </div>
+
+        {/* Save / Reassign to Asset Drawer */}
+        {showReassign && (
+          <div className={styles.reassignCard}>
+            <span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
+              Reassign to Registered Asset:
+            </span>
+            <select
+              className={styles.reassignSelect}
+              value={selectedTargetAssetId}
+              onChange={(e) => setSelectedTargetAssetId(e.target.value)}
+            >
+              <option value="">Choose target structure…</option>
+              {availableAssets.map((a) => (
+                <option key={a.id} value={a.id} disabled={a.id === asset.id}>
+                  {a.name} ({a.asset_type}){a.id === asset.id ? ' (Current)' : ''}
+                </option>
+              ))}
+            </select>
+            <Button
+              variant="primary"
+              size="sm"
+              disabled={!selectedTargetAssetId || isReassigning}
+              onClick={handleExecuteReassign}
+            >
+              {isReassigning ? 'Reassigning…' : 'Confirm Reassign'}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowReassign(false)}
+            >
+              Cancel
+            </Button>
+          </div>
+        )}
+
+        {reassignSuccess && (
+          <div style={{ color: 'var(--color-sage)', fontSize: '0.8125rem', marginTop: '6px' }}>
+            ✓ {reassignSuccess}
+          </div>
+        )}
       </div>
 
       {/* ── Action Buttons ── */}
@@ -303,6 +369,24 @@ export default function InspectionFindingsCard({
           <Button variant="secondary" onClick={onReset}>
             <RotateCcw size={16} /> Run Another Inspection
           </Button>
+
+          {isCompleted && (
+            <Link to={`/vision?inspectionId=${inspection.id}`} style={{ textDecoration: 'none' }}>
+              <Button variant="secondary">
+                <ScanLine size={16} /> Open in Vision Studio
+              </Button>
+            </Link>
+          )}
+
+          {onReassignAsset && availableAssets.length > 0 && (
+            <Button
+              variant="ghost"
+              onClick={() => setShowReassign((prev) => !prev)}
+              title="Associate this inspection with a different registered asset"
+            >
+              <BookmarkCheck size={16} /> Save / Reassign to Asset
+            </Button>
+          )}
 
           {isFailed && (!inspection.input_path || inspection.error_message?.toLowerCase().includes('evidence')) && onRetryWithEvidence && (
             <Button

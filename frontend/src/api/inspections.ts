@@ -31,6 +31,7 @@ export interface InspectionCreate {
 }
 
 export interface InspectionUpdate {
+  asset_id?: string
   status?: InspectionStatus
   notes?: string | null
   health_score?: number | null

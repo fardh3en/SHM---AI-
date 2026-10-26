@@ -226,8 +226,15 @@ class InspectionService(BaseService):
         if inspection is None:
             logger.warning(f"Update failed — inspection not found: {inspection_id!r}")
             return None
+
+        update_data = data.model_dump(exclude_none=True)
+        if "asset_id" in update_data:
+            target_asset_id = update_data["asset_id"]
+            if not await self._asset_repo.exists(target_asset_id):
+                raise ValidationError(f"Target asset '{target_asset_id}' not found.")
+
         updated = await self._repo.update_fields(
-            inspection, **data.model_dump(exclude_none=True)
+            inspection, **update_data
         )
         logger.info(
             f"Inspection updated: id={inspection_id!r} status={updated.status.value!r}"

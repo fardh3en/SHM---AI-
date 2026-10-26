@@ -34,6 +34,10 @@ class InspectionUpdate(SHMBaseSchema):
     Request body for PATCH /inspections/{id}.
     Typically used by operators and the vision engine.
     """
+    asset_id: str | None = Field(
+        default=None,
+        description="Reassign or associate this inspection to a different registered asset.",
+    )
     status: InspectionStatus | None = None
     notes: str | None = None
     health_score: float | None = Field(default=None, ge=0.0, le=100.0)

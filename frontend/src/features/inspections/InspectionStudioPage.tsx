@@ -1,14 +1,15 @@
 import { useState, useEffect } from 'react'
-import { useSearchParams, Link } from 'react-router-dom'
+import { useSearchParams, useLocation } from 'react-router-dom'
 import {
   Layers,
   UploadCloud,
-  FileCheck,
   ChevronRight,
   ArrowLeft,
   History,
   AlertCircle,
   Loader2,
+  ScanLine,
+  PlusCircle,
 } from 'lucide-react'
 import PageHeader from '../../components/layout/PageHeader'
 import Button from '../../components/ui/Button'
@@ -17,14 +18,14 @@ import EmptyState from '../../components/ui/EmptyState'
 import AssetSelector from './AssetSelector'
 import EvidenceUploader, { type SelectedMediaFile } from './EvidenceUploader'
 import InspectionFindingsCard from './InspectionFindingsCard'
-import { useAsset } from '../../hooks/useAssets'
+import { useAsset, useAssets, useCreateAsset } from '../../hooks/useAssets'
 import { useAssetInspections } from '../../hooks/useAssetInspections'
 import {
   useCreateInspection,
   useUpdateInspection,
   useRunInspection,
 } from '../../hooks/useInspections'
-import type { Asset } from '../../api/assets'
+import type { Asset, AssetType } from '../../api/assets'
 import type { Inspection, InspectionSource } from '../../api/inspections'
 import { evidenceApi } from '../../api/evidence'
 import styles from './InspectionStudioPage.module.css'
@@ -45,14 +46,20 @@ function formatDate(iso: string): string {
 
 export default function InspectionStudioPage() {
   const [searchParams] = useSearchParams()
+  const location = useLocation()
   const initialAssetId = searchParams.get('asset_id')
   const initialEvidencePath = searchParams.get('evidence_path')
 
-  // Step state
+  // Step state — defaults to Step 1: Upload Crack Photograph (Photo-First)
   const [step, setStep] = useState<Step>(1)
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null)
+  const [structureMode, setStructureMode] = useState<'existing' | 'quick'>('quick')
+  const [quickName, setQuickName] = useState<string>('')
+  const [quickCategory, setQuickCategory] = useState<AssetType>('building')
+
   const [source, setSource] = useState<InspectionSource>('image')
   const [notes, setNotes] = useState<string>('')
+  const [selectedTags, setSelectedTags] = useState<string[]>([])
   const [mediaFile, setMediaFile] = useState<SelectedMediaFile | null>(null)
   const [triggerVisionPipeline, setTriggerVisionPipeline] = useState<boolean>(true)
   const [retryInspectionId, setRetryInspectionId] = useState<string | null>(null)
@@ -62,20 +69,56 @@ export default function InspectionStudioPage() {
   const [submissionError, setSubmissionError] = useState<string | null>(null)
 
   // Mutations
+  const createAssetMutation = useCreateAsset()
   const createMutation = useCreateInspection()
   const updateMutation = useUpdateInspection()
   const runMutation = useRunInspection()
 
   // Queries
   const { data: preloadedAsset } = useAsset(initialAssetId ?? undefined)
+  const { data: allAssetsData } = useAssets(1, 100)
+  const assetsList = allAssetsData?.items ?? []
+
   const { data: assetInspections, isLoading: inspectionsLoading } = useAssetInspections(
     selectedAsset?.id
   )
 
-  // If asset_id or evidence_path was provided in URL, pre-populate
+  // Check for preloaded file passed via router location state (e.g. from Dashboard drop)
+  useEffect(() => {
+    const locState = location.state as { preloadedFile?: File } | null
+    if (locState?.preloadedFile && !mediaFile) {
+      const file = locState.preloadedFile
+      const objectUrl = URL.createObjectURL(file)
+      const img = new Image()
+      img.onload = () => {
+        setMediaFile({
+          file,
+          previewUrl: objectUrl,
+          width: img.naturalWidth,
+          height: img.naturalHeight,
+          formattedSize: `${(file.size / (1024 * 1024)).toFixed(2)} MB`,
+          isSampleEvidence: false,
+          caption: file.name,
+        })
+      }
+      img.onerror = () => {
+        setMediaFile({
+          file,
+          previewUrl: objectUrl,
+          formattedSize: `${(file.size / (1024 * 1024)).toFixed(2)} MB`,
+          isSampleEvidence: false,
+          caption: file.name,
+        })
+      }
+      img.src = objectUrl
+    }
+  }, [location.state, mediaFile])
+
+  // Pre-populate asset or archived evidence if query params provided
   useEffect(() => {
     if (preloadedAsset && !selectedAsset) {
       setSelectedAsset(preloadedAsset)
+      setStructureMode('existing')
       if (initialEvidencePath) {
         setMediaFile({
           previewUrl: initialEvidencePath,
@@ -83,21 +126,60 @@ export default function InspectionStudioPage() {
           isSampleEvidence: true,
           caption: initialEvidencePath.split('/').pop(),
         })
-        setStep(2)
+        setStep(3)
       }
     }
   }, [preloadedAsset, selectedAsset, initialEvidencePath])
 
+  // When mediaFile is selected, default a quick name if empty
+  useEffect(() => {
+    if (mediaFile && !quickName && !selectedAsset) {
+      const baseStem = mediaFile.caption
+        ? mediaFile.caption.replace(/\.[^/.]+$/, '').replace(/[^a-zA-Z0-9_\-\s]/g, ' ')
+        : 'Inspected Structure'
+      setQuickName(baseStem.trim() || 'Monitored Structure')
+    }
+  }, [mediaFile, quickName, selectedAsset])
+
   const [isUploading, setIsUploading] = useState(false)
   const isSubmitting =
-    isUploading || createMutation.isPending || updateMutation.isPending || runMutation.isPending
+    isUploading ||
+    createAssetMutation.isPending ||
+    createMutation.isPending ||
+    updateMutation.isPending ||
+    runMutation.isPending
+
+  const handleToggleTag = (tag: string) => {
+    setSelectedTags((prev) =>
+      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
+    )
+  }
 
   // Handle Form Submission
   const handleSubmitInspection = async () => {
-    if (!selectedAsset) return
     setSubmissionError(null)
 
+    if (!mediaFile) {
+      setSubmissionError('Please select or upload a crack photograph before running analysis.')
+      return
+    }
+
     try {
+      let activeAsset = selectedAsset
+
+      // If user opted for Quick Structure Entry and no asset is chosen, register it
+      if (!activeAsset) {
+        const structureName = quickName.trim() || 'Monitored Structure'
+        const tagNotes = selectedTags.length > 0 ? `Field tags: ${selectedTags.join(', ')}` : undefined
+        const createdAsset = await createAssetMutation.mutateAsync({
+          name: structureName,
+          asset_type: quickCategory,
+          description: tagNotes,
+        })
+        activeAsset = createdAsset
+        setSelectedAsset(createdAsset)
+      }
+
       let currentInspection: Inspection
       let inputPath: string | undefined = undefined
 
@@ -109,7 +191,7 @@ export default function InspectionStudioPage() {
           try {
             const uploadRes = await evidenceApi.upload(
               mediaFile.file,
-              selectedAsset.id,
+              activeAsset.id,
               notes.trim() || mediaFile.caption || mediaFile.file.name
             )
             inputPath = uploadRes.file_path
@@ -122,6 +204,12 @@ export default function InspectionStudioPage() {
         }
       }
 
+      // Synthesize notes with tags
+      const noteParts: string[] = []
+      if (selectedTags.length > 0) noteParts.push(`Observations: ${selectedTags.join(', ')}`)
+      if (notes.trim()) noteParts.push(notes.trim())
+      const combinedNotes = noteParts.length > 0 ? noteParts.join(' | ') : undefined
+
       if (retryInspectionId) {
         // Updating existing inspection with newly attached evidence
         currentInspection = await updateMutation.mutateAsync({
@@ -130,16 +218,16 @@ export default function InspectionStudioPage() {
             input_path: inputPath,
             status: 'pending',
             error_message: null,
-            notes: notes.trim() || undefined,
+            notes: combinedNotes,
           },
         })
       } else {
         // 1. Create base inspection record
         currentInspection = await createMutation.mutateAsync({
-          asset_id: selectedAsset.id,
+          asset_id: activeAsset.id,
           source,
           input_path: inputPath,
-          notes: notes.trim() || undefined,
+          notes: combinedNotes,
         })
       }
 
@@ -149,8 +237,6 @@ export default function InspectionStudioPage() {
           const runResult = await runMutation.mutateAsync(currentInspection.id)
           currentInspection = runResult
         } catch (err: unknown) {
-          // If the run endpoint threw an HTTP error rather than returning 200 with failed status,
-          // capture it so the user sees real diagnostics
           const errorMsg = err instanceof Error ? err.message : String(err)
           currentInspection = {
             ...currentInspection,
@@ -187,16 +273,31 @@ export default function InspectionStudioPage() {
 
   // Handle return to evidence step for an existing inspection
   const handleRetryWithEvidence = () => {
-    if (!completedInspection || !selectedAsset) return
+    if (!completedInspection) return
     setRetryInspectionId(completedInspection.id)
     setSubmissionError(null)
-    setStep(2)
+    setStep(1)
+  }
+
+  // Handle Reassign / Associate with another Asset
+  const handleReassignAsset = async (targetAssetId: string) => {
+    if (!completedInspection) return
+    const updated = await updateMutation.mutateAsync({
+      id: completedInspection.id,
+      data: { asset_id: targetAssetId },
+    })
+    setCompletedInspection(updated)
+    const newAssignedAsset = assetsList.find((a) => a.id === targetAssetId)
+    if (newAssignedAsset) {
+      setSelectedAsset(newAssignedAsset)
+    }
   }
 
   // Reset entire studio workflow
   const handleResetWorkflow = () => {
     setStep(1)
     setNotes('')
+    setSelectedTags([])
     setMediaFile(null)
     setCompletedInspection(null)
     setSubmissionError(null)
@@ -207,7 +308,7 @@ export default function InspectionStudioPage() {
     <div className={styles.container}>
       <PageHeader
         title="Inspection Studio"
-        description="Structural health diagnostic pipeline: assign asset, ingest sensor or imagery evidence, and execute vision intelligence."
+        description="Photo-first structural diagnostic pipeline: upload crack imagery, assign structure context, and execute vision AI."
         breadcrumb={[
           { label: 'Dashboard', to: '/dashboard' },
           { label: 'Inspection Studio' },
@@ -222,11 +323,11 @@ export default function InspectionStudioPage() {
             className={`${styles.stepItem} ${step === 1 ? styles.stepActive : ''} ${
               step > 1 ? styles.stepCompleted : ''
             }`}
-            onClick={() => step > 1 && setStep(1)}
+            onClick={() => setStep(1)}
             disabled={step === 4 || isSubmitting}
           >
             <span className={styles.stepNumber}>{step > 1 ? '✓' : '1'}</span>
-            <span>Target Asset</span>
+            <span>Upload Crack Photo</span>
           </button>
 
           <div className={styles.stepDivider} aria-hidden="true" />
@@ -237,10 +338,10 @@ export default function InspectionStudioPage() {
               step > 2 ? styles.stepCompleted : ''
             }`}
             onClick={() => step > 2 && setStep(2)}
-            disabled={step === 4 || !selectedAsset || isSubmitting}
+            disabled={step === 4 || !mediaFile || isSubmitting}
           >
             <span className={styles.stepNumber}>{step > 2 ? '✓' : '2'}</span>
-            <span>Evidence & Details</span>
+            <span>Structure &amp; Context</span>
           </button>
 
           <div className={styles.stepDivider} aria-hidden="true" />
@@ -251,10 +352,10 @@ export default function InspectionStudioPage() {
               step > 3 ? styles.stepCompleted : ''
             }`}
             onClick={() => step > 3 && setStep(3)}
-            disabled={step === 4 || !selectedAsset || isSubmitting}
+            disabled={step === 4 || !mediaFile || isSubmitting}
           >
             <span className={styles.stepNumber}>{step > 3 ? '✓' : '3'}</span>
-            <span>Review & Run</span>
+            <span>Review &amp; Run</span>
           </button>
 
           <div className={styles.stepDivider} aria-hidden="true" />
@@ -268,73 +369,136 @@ export default function InspectionStudioPage() {
           </div>
         </nav>
 
-        {/* ── Step 1: Select Asset ── */}
+        {/* ── Step 1: Upload Crack Photograph (Photo-First) ── */}
         {step === 1 && (
           <div className={styles.workspace}>
             <div className={styles.stepCard}>
               <div className={styles.stepHeader}>
-                <h2 className={styles.stepTitle}>Step 1: Select Registered Asset</h2>
+                <h2 className={styles.stepTitle}>Step 1: Upload Crack Photograph</h2>
                 <p className={styles.stepSubtitle}>
-                  Choose the structural infrastructure unit from the verified asset registry to
-                  associate with this inspection session.
-                </p>
-              </div>
-
-              <AssetSelector
-                selectedAsset={selectedAsset}
-                onSelectAsset={(asset) => setSelectedAsset(asset)}
-              />
-
-              <div className={styles.stepFooter}>
-                <span style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
-                  {selectedAsset
-                    ? `Selected: ${selectedAsset.name} (${selectedAsset.id})`
-                    : 'Select an asset from the list above to proceed.'}
-                </span>
-
-                <Button
-                  variant="primary"
-                  disabled={!selectedAsset}
-                  onClick={() => setStep(2)}
-                >
-                  Configure Evidence <ChevronRight size={16} />
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ── Step 2: Evidence & Configuration ── */}
-        {step === 2 && selectedAsset && (
-          <div className={styles.workspace}>
-            <div className={styles.stepCard}>
-              <div className={styles.stepHeader}>
-                <h2 className={styles.stepTitle}>Step 2: Evidence Upload & Capture Parameters</h2>
-                <p className={styles.stepSubtitle}>
-                  Target asset:{' '}
-                  <strong style={{ color: 'var(--text-primary)' }}>{selectedAsset.name}</strong>{' '}
-                  ({selectedAsset.asset_type}). Ingest high-resolution photographic evidence or
-                  configure manual field observations.
+                  Start by uploading or dropping a high-resolution photograph of the structural crack
+                  or defect.
                 </p>
               </div>
 
               <EvidenceUploader
-                assetId={selectedAsset.id}
+                assetId={selectedAsset?.id}
                 source={source}
                 onChangeSource={setSource}
                 notes={notes}
                 onChangeNotes={setNotes}
                 mediaFile={mediaFile}
                 onSelectMediaFile={setMediaFile}
+                selectedTags={selectedTags}
+                onToggleTag={handleToggleTag}
               />
 
               <div className={styles.stepFooter}>
+                <span style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
+                  {mediaFile
+                    ? `Staged: ${mediaFile.caption ?? 'Crack photo'} (${mediaFile.formattedSize})`
+                    : 'Select or drop an image above to continue.'}
+                </span>
+
+                <Button
+                  variant="primary"
+                  disabled={!mediaFile}
+                  onClick={() => setStep(2)}
+                >
+                  Configure Structure &amp; Context <ChevronRight size={16} />
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── Step 2: Structure & Context (Optional / Flexible) ── */}
+        {step === 2 && (
+          <div className={styles.workspace}>
+            <div className={styles.stepCard}>
+              <div className={styles.stepHeader}>
+                <h2 className={styles.stepTitle}>Step 2: Structural Asset Association</h2>
+                <p className={styles.stepSubtitle}>
+                  Optionally link this inspection to an existing registered civil structure, or provide a quick structure name.
+                </p>
+              </div>
+
+              {/* Mode Switcher */}
+              <div className={styles.modeTabs}>
+                <button
+                  type="button"
+                  className={`${styles.modeTab} ${structureMode === 'quick' ? styles.modeTabActive : ''}`}
+                  onClick={() => setStructureMode('quick')}
+                >
+                  <PlusCircle size={15} />
+                  <span>Quick Structure Entry (Recommended)</span>
+                </button>
+                <button
+                  type="button"
+                  className={`${styles.modeTab} ${structureMode === 'existing' ? styles.modeTabActive : ''}`}
+                  onClick={() => setStructureMode('existing')}
+                >
+                  <Layers size={15} />
+                  <span>Select from Registered Assets ({assetsList.length})</span>
+                </button>
+              </div>
+
+              {structureMode === 'quick' ? (
+                <div className={styles.quickAssetCard}>
+                  <div className={styles.quickAssetRow}>
+                    <div>
+                      <label className={styles.label} htmlFor="quick-struct-name">
+                        Structure Name
+                      </label>
+                      <input
+                        id="quick-struct-name"
+                        type="text"
+                        className={styles.input}
+                        placeholder="e.g. College Block A or Highway Overpass"
+                        value={quickName}
+                        onChange={(e) => setQuickName(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label className={styles.label} htmlFor="quick-struct-category">
+                        Category
+                      </label>
+                      <select
+                        id="quick-struct-category"
+                        className={styles.select}
+                        value={quickCategory}
+                        onChange={(e) => setQuickCategory(e.target.value as AssetType)}
+                      >
+                        <option value="building">Building</option>
+                        <option value="bridge">Bridge</option>
+                        <option value="road">Road / Flyover</option>
+                        <option value="tunnel">Tunnel</option>
+                        <option value="dam">Dam</option>
+                        <option value="other">Other Structure</option>
+                      </select>
+                    </div>
+                  </div>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                    An asset record will be automatically created with this name upon running the analysis. You can enrich engineering drawings or materials anytime later.
+                  </span>
+                </div>
+              ) : (
+                <AssetSelector
+                  selectedAsset={selectedAsset}
+                  onSelectAsset={(asset) => setSelectedAsset(asset)}
+                />
+              )}
+
+              <div className={styles.stepFooter}>
                 <Button variant="ghost" onClick={() => setStep(1)}>
-                  <ArrowLeft size={16} /> Back to Asset Selection
+                  <ArrowLeft size={16} /> Back to Photo
                 </Button>
 
-                <Button variant="primary" onClick={() => setStep(3)}>
-                  Review & Submit <ChevronRight size={16} />
+                <Button
+                  variant="primary"
+                  onClick={() => setStep(3)}
+                >
+                  Review &amp; Run Analysis <ChevronRight size={16} />
                 </Button>
               </div>
             </div>
@@ -342,14 +506,14 @@ export default function InspectionStudioPage() {
         )}
 
         {/* ── Step 3: Review Before Submit ── */}
-        {step === 3 && selectedAsset && (
+        {step === 3 && mediaFile && (
           <div className={styles.workspace}>
             <div className={styles.stepCard}>
               <div className={styles.stepHeader}>
-                <h2 className={styles.stepTitle}>Step 3: Verification & Pipeline Dispatch</h2>
+                <h2 className={styles.stepTitle}>Step 3: Verification &amp; Pipeline Dispatch</h2>
                 <p className={styles.stepSubtitle}>
-                  Verify telemetry parameters and choose execution mode before committing this
-                  inspection record to the structural database.
+                  Review the inspection parameters before sending the photographic bytes to Render
+                  for automated computer vision defect segmentation.
                 </p>
               </div>
 
@@ -357,115 +521,97 @@ export default function InspectionStudioPage() {
                 <div
                   style={{
                     background: 'rgba(224, 86, 74, 0.1)',
-                    border: '1px solid rgba(224, 86, 74, 0.35)',
-                    padding: 'var(--space-4)',
-                    borderRadius: 'var(--radius-sm)',
+                    border: '1px solid rgba(224, 86, 74, 0.4)',
                     color: '#ff8b80',
+                    padding: '12px 16px',
+                    borderRadius: 'var(--radius-sm)',
+                    fontSize: '0.875rem',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '10px',
-                    fontSize: '0.875rem',
+                    gap: '8px',
                   }}
+                  role="alert"
                 >
-                  <AlertCircle size={18} />
+                  <AlertCircle size={16} />
                   <span>{submissionError}</span>
                 </div>
               )}
 
               <div className={styles.reviewGrid}>
-                {/* Asset Summary */}
+                {/* Left: Media Information */}
                 <div className={styles.reviewSection}>
                   <div className={styles.reviewSectionTitle}>
-                    <Layers size={14} /> Structural Asset Summary
+                    <UploadCloud size={14} /> Photographic Evidence
                   </div>
-                  <div className={styles.reviewFieldList}>
-                    <div className={styles.reviewRow}>
-                      <span className={styles.reviewLabel}>Asset Name</span>
-                      <span className={styles.reviewValue} style={{ fontWeight: 600 }}>
-                        {selectedAsset.name}
-                      </span>
-                    </div>
-                    <div className={styles.reviewRow}>
-                      <span className={styles.reviewLabel}>Category / Type</span>
-                      <span className={styles.reviewValue}>{selectedAsset.asset_type}</span>
-                    </div>
-                    <div className={styles.reviewRow}>
-                      <span className={styles.reviewLabel}>Location</span>
-                      <span className={styles.reviewValue}>
-                        {selectedAsset.location || 'Unspecified'}
-                      </span>
-                    </div>
-                    <div className={styles.reviewRow}>
-                      <span className={styles.reviewLabel}>Primary Material</span>
-                      <span className={styles.reviewValue}>
-                        {selectedAsset.material || 'Unspecified'}
-                      </span>
-                    </div>
-                    <div className={styles.reviewRow}>
-                      <span className={styles.reviewLabel}>Asset Status</span>
-                      <div>
-                        <StatusChip status={selectedAsset.status} size="sm" />
+                  <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+                    <img
+                      src={mediaFile.previewUrl}
+                      alt="Staged evidence preview"
+                      style={{
+                        width: '96px',
+                        height: '72px',
+                        objectFit: 'cover',
+                        borderRadius: 'var(--radius-sm)',
+                        border: '1px solid var(--border-medium)',
+                        background: '#000',
+                      }}
+                    />
+                    <div className={styles.reviewFieldList}>
+                      <div className={styles.reviewRow}>
+                        <span className={styles.reviewLabel}>File Name</span>
+                        <span className={styles.reviewValue}>
+                          {mediaFile.caption ?? mediaFile.file?.name ?? 'Staged file'}
+                        </span>
+                      </div>
+                      <div className={styles.reviewRow}>
+                        <span className={styles.reviewLabel}>Resolution &amp; Size</span>
+                        <span className={styles.reviewValue}>
+                          {mediaFile.width && mediaFile.height
+                            ? `${mediaFile.width} × ${mediaFile.height} px · ${mediaFile.formattedSize}`
+                            : mediaFile.formattedSize}
+                        </span>
                       </div>
                     </div>
                   </div>
                 </div>
 
-                {/* Evidence & Parameters */}
+                {/* Right: Target Structure */}
                 <div className={styles.reviewSection}>
                   <div className={styles.reviewSectionTitle}>
-                    <UploadCloud size={14} /> Evidence & Survey Parameters
+                    <Layers size={14} /> Target Structure &amp; Context
                   </div>
                   <div className={styles.reviewFieldList}>
                     <div className={styles.reviewRow}>
-                      <span className={styles.reviewLabel}>Data Capture Source</span>
+                      <span className={styles.reviewLabel}>Structure Name</span>
+                      <span className={styles.reviewValue} style={{ fontWeight: 600 }}>
+                        {selectedAsset
+                          ? selectedAsset.name
+                          : quickName.trim() || 'Monitored Structure'}
+                      </span>
+                    </div>
+                    <div className={styles.reviewRow}>
+                      <span className={styles.reviewLabel}>Category</span>
+                      <span className={styles.reviewValue} style={{ textTransform: 'capitalize' }}>
+                        {selectedAsset ? selectedAsset.asset_type : quickCategory}
+                      </span>
+                    </div>
+                    <div className={styles.reviewRow}>
+                      <span className={styles.reviewLabel}>Acquisition Modality</span>
                       <span className={styles.reviewValue} style={{ textTransform: 'capitalize' }}>
                         {source.replace('_', ' ')}
                       </span>
                     </div>
-
-                    <div className={styles.reviewRow}>
-                      <span className={styles.reviewLabel}>Attached Media File</span>
-                      <span className={styles.reviewValue}>
-                        {mediaFile ? (
-                          <>
-                            <code>
-                              {mediaFile.caption ?? (mediaFile.file ? mediaFile.file.name : 'Staged Evidence')}
-                            </code>{' '}
-                            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                              ({mediaFile.isSampleEvidence ? 'Archived Photograph' : 'Local File Upload'}
-                              {mediaFile.width && mediaFile.height
-                                ? ` • ${mediaFile.width}×${mediaFile.height}px`
-                                : ''}
-                              )
-                            </span>
-                          </>
-                        ) : (
-                          <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>
-                            None attached (Observation notes only)
-                          </span>
-                        )}
-                      </span>
-                    </div>
-
-                    <div className={styles.reviewRow}>
-                      <span className={styles.reviewLabel}>Field Notes</span>
-                      <span
-                        className={styles.reviewValue}
-                        style={{
-                          color: notes.trim() ? 'var(--text-primary)' : 'var(--text-muted)',
-                          fontStyle: notes.trim() ? 'normal' : 'italic',
-                          maxHeight: '80px',
-                          overflowY: 'auto',
-                        }}
-                      >
-                        {notes.trim() || 'No field notes entered.'}
-                      </span>
-                    </div>
+                    {selectedTags.length > 0 && (
+                      <div className={styles.reviewRow}>
+                        <span className={styles.reviewLabel}>Observed Tags</span>
+                        <span className={styles.reviewValue}>{selectedTags.join(', ')}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
 
-              {/* Execution Options */}
+              {/* Automated Execution Toggle */}
               <label className={styles.executionOption}>
                 <input
                   type="checkbox"
@@ -473,68 +619,41 @@ export default function InspectionStudioPage() {
                   onChange={(e) => setTriggerVisionPipeline(e.target.checked)}
                 />
                 <div className={styles.executionText}>
-                  <div className={styles.executionTitle}>
-                    Execute Computer Vision Inference Pipeline (POST /api/v1/inspections/{'{id}'}/run)
-                  </div>
-                  <div className={styles.executionDesc}>
-                    When checked, the backend will trigger automated defect segmentation and health
-                    score evaluation immediately following registration. If model weights are
-                    unprovisioned on the backend, the pipeline will capture and surface the true
-                    error without fabricating fake scores.
-                  </div>
+                  <span className={styles.executionTitle}>
+                    Execute Computer Vision Pipeline Immediately
+                  </span>
+                  <span className={styles.executionDesc}>
+                    When enabled, the backend will immediately run defect segmentation and
+                    structural health scoring against the uploaded photograph.
+                  </span>
                 </div>
               </label>
 
-              {triggerVisionPipeline && !mediaFile && (
-                <div
-                  style={{
-                    background: 'rgba(216, 198, 90, 0.1)',
-                    border: '1px solid rgba(216, 198, 90, 0.35)',
-                    padding: 'var(--space-4)',
-                    borderRadius: 'var(--radius-sm)',
-                    color: '#e2d37c',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '12px',
-                    fontSize: '0.875rem',
-                    marginTop: 'var(--space-4)',
-                  }}
-                >
-                  <AlertCircle size={20} style={{ flexShrink: 0 }} />
-                  <div>
-                    <strong>Photographic Evidence Missing:</strong> Automated computer vision defect segmentation requires an uploaded image or archived photograph.
-                    Please <button type="button" onClick={() => setStep(2)} style={{ background: 'none', border: 'none', color: 'var(--color-ivory)', textDecoration: 'underline', cursor: 'pointer', padding: 0, font: 'inherit' }}>return to Step 2 to attach evidence</button>, or uncheck automated vision inference above to register this inspection as a manual observation.
-                  </div>
-                </div>
-              )}
-
               <div className={styles.stepFooter}>
-                <Button
-                  variant="ghost"
-                  onClick={() => setStep(2)}
-                  disabled={isSubmitting}
-                >
-                  <ArrowLeft size={16} /> Edit Evidence & Notes
+                <Button variant="ghost" onClick={() => setStep(2)} disabled={isSubmitting}>
+                  <ArrowLeft size={16} /> Back to Structure Context
                 </Button>
 
                 <Button
                   variant="primary"
                   onClick={handleSubmitInspection}
-                  disabled={isSubmitting || (triggerVisionPipeline && !mediaFile)}
+                  disabled={isSubmitting}
                 >
-                  {isSubmitting ? (
+                  {isUploading ? (
                     <>
-                      <Loader2 size={16} className="spin" style={{ animation: 'spin 1s linear infinite' }} />{' '}
-                      {isUploading
-                        ? 'Uploading Evidence Image...'
-                        : retryInspectionId
-                        ? 'Updating & Analyzing...'
-                        : 'Registering & Analyzing...'}
+                      <Loader2 size={16} className="spin" /> Uploading Evidence Image…
+                    </>
+                  ) : runMutation.isPending ? (
+                    <>
+                      <Loader2 size={16} className="spin" /> Running Vision AI Pipeline…
+                    </>
+                  ) : isSubmitting ? (
+                    <>
+                      <Loader2 size={16} className="spin" /> Processing…
                     </>
                   ) : (
                     <>
-                      <FileCheck size={16} />{' '}
-                      {retryInspectionId ? 'Update Evidence & Execute Inspection' : 'Submit & Execute Inspection'}
+                      <ScanLine size={16} /> Run Crack Analysis
                     </>
                   )}
                 </Button>
@@ -543,51 +662,58 @@ export default function InspectionStudioPage() {
           </div>
         )}
 
-        {/* ── Step 4: Diagnostic Findings ── */}
-        {step === 4 && completedInspection && selectedAsset && (
+        {/* ── Step 4: Diagnostic Findings & Actions ── */}
+        {step === 4 && completedInspection && (
           <div className={styles.workspace}>
             <InspectionFindingsCard
               inspection={completedInspection}
-              asset={selectedAsset}
-              onReset={handleResetWorkflow}
-              onRunVision={
-                completedInspection.status === 'pending' || completedInspection.status === 'failed'
-                  ? handleRunVisionPipelineOnCompleted
-                  : undefined
+              asset={
+                selectedAsset ?? {
+                  id: completedInspection.asset_id,
+                  name: quickName.trim() || 'Monitored Structure',
+                  asset_type: quickCategory,
+                  status: 'active' as const,
+                  location: null,
+                  description: null,
+                  construction_year: null,
+                  material: null,
+                  design_life_years: null,
+                  latest_health_score: completedInspection.health_score,
+                  created_at: completedInspection.created_at,
+                  updated_at: completedInspection.updated_at,
+                }
               }
+              onReset={handleResetWorkflow}
+              onRunVision={handleRunVisionPipelineOnCompleted}
               isRunningVision={runMutation.isPending}
               onRetryWithEvidence={handleRetryWithEvidence}
+              onReassignAsset={handleReassignAsset}
+              availableAssets={assetsList}
             />
           </div>
         )}
 
-        {/* ── Asset Historical Inspection Ledger ── */}
+        {/* ── Asset Historical Inspection Ledger (Shown if existing asset selected) ── */}
         {selectedAsset && step < 4 && (
-          <section className={styles.historySection} aria-label="Asset Historical Ledger">
+          <section className={styles.historySection} aria-label="Asset Historical Inspections">
             <div className={styles.historyHeader}>
-              <h3 className={styles.historyTitle}>
-                <History size={16} /> Prior Inspections for {selectedAsset.name}
-              </h3>
-              <Link
-                to={`/assets/${selectedAsset.id}`}
-                style={{
-                  fontSize: '0.8125rem',
-                  color: 'var(--color-mineral)',
-                  textDecoration: 'none',
-                }}
-              >
-                View Asset Dossier →
-              </Link>
+              <div className={styles.historyTitle}>
+                <History size={16} />
+                <span>Historical Inspection Ledger ({selectedAsset.name})</span>
+              </div>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                {assetInspections?.length ?? 0} records
+              </span>
             </div>
 
             {inspectionsLoading ? (
               <div style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>
-                Loading inspection history...
+                Loading asset inspection ledger…
               </div>
             ) : !assetInspections || assetInspections.length === 0 ? (
               <EmptyState
-                title="No prior inspection records"
-                description="This asset does not yet have historical inspection records in the database."
+                title="No prior inspections"
+                description={`No inspection records have been registered for ${selectedAsset.name} yet.`}
               />
             ) : (
               <div style={{ overflowX: 'auto' }}>
@@ -596,52 +722,28 @@ export default function InspectionStudioPage() {
                     <tr>
                       <th>Date</th>
                       <th>Inspection ID</th>
-                      <th>Source</th>
-                      <th>Status</th>
+                      <th>Modality</th>
                       <th>Defects</th>
                       <th>Health Score</th>
+                      <th>Status</th>
                     </tr>
                   </thead>
                   <tbody>
                     {assetInspections.map((insp) => (
                       <tr key={insp.id}>
                         <td>{formatDate(insp.created_at)}</td>
-                        <td>
-                          <code
-                            style={{
-                              fontFamily: 'var(--font-mono)',
-                              fontSize: '0.75rem',
-                              color: 'var(--color-mineral)',
-                            }}
-                          >
-                            {insp.id.slice(0, 8)}...
-                          </code>
+                        <td style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem' }}>
+                          #{insp.id.slice(0, 8)}
                         </td>
                         <td style={{ textTransform: 'capitalize' }}>
                           {insp.source.replace('_', ' ')}
                         </td>
-                        <td>
-                          <StatusChip status={insp.status} size="sm" />
-                        </td>
                         <td>{insp.defect_count}</td>
                         <td>
-                          {insp.health_score !== null ? (
-                            <span
-                              style={{
-                                fontWeight: 600,
-                                color:
-                                  insp.health_score >= 75
-                                    ? 'var(--color-sage)'
-                                    : insp.health_score >= 50
-                                    ? 'var(--color-mineral)'
-                                    : '#ff8b80',
-                              }}
-                            >
-                              {insp.health_score.toFixed(1)}
-                            </span>
-                          ) : (
-                            '—'
-                          )}
+                          {insp.health_score !== null ? `${insp.health_score.toFixed(1)}/100` : '—'}
+                        </td>
+                        <td>
+                          <StatusChip status={insp.status} size="sm" />
                         </td>
                       </tr>
                     ))}

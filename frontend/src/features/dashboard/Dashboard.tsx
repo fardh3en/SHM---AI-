@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import PageHeader from '../../components/layout/PageHeader'
 import SectionHeader from '../../components/ui/SectionHeader'
 import SystemStatusBar from './SystemStatusBar'
@@ -6,9 +7,13 @@ import RecentInspectionsTable from './RecentInspectionsTable'
 import AssetTypeChart from './AssetTypeChart'
 import InspectionStatusBar from './InspectionStatusBar'
 import QuickActionsPanel from './QuickActionsPanel'
+import HeroInspectionAction from './HeroInspectionAction'
+import AssetCreateModal from '../assets/AssetCreateModal'
 import styles from './Dashboard.module.css'
 
 export default function Dashboard() {
+  const [isAssetModalOpen, setIsAssetModalOpen] = useState(false)
+
   return (
     <>
       <SystemStatusBar />
@@ -20,6 +25,10 @@ export default function Dashboard() {
       />
 
       <div className={styles.content}>
+        {/* ── PRIORITY 1: Prominent Image Inspection Hero ─────────────────── */}
+        <section aria-label="Upload crack image" className={styles.section}>
+          <HeroInspectionAction onOpenAssetModal={() => setIsAssetModalOpen(true)} />
+        </section>
 
         {/* ── Row 1: Key Metrics ─────────────────────────────────────────── */}
         <section aria-label="Key metrics" className={styles.section}>
@@ -28,7 +37,6 @@ export default function Dashboard() {
 
         {/* ── Row 2: Inspections Table + Asset Distribution ─────────────── */}
         <div className={styles.splitRow}>
-
           {/* Left: recent inspections (60%) */}
           <section className={styles.mainPanel} aria-label="Recent inspections">
             <SectionHeader
@@ -54,7 +62,6 @@ export default function Dashboard() {
 
         {/* ── Row 3: Inspection Status + Quick Actions ──────────────────── */}
         <div className={styles.splitRow}>
-
           {/* Left: status breakdown */}
           <section className={styles.mainPanel} aria-label="Inspection status breakdown">
             <SectionHeader
@@ -82,12 +89,17 @@ export default function Dashboard() {
         <aside className={styles.notice} role="note">
           <span className={styles.noticeLabel}>SHM-AI Engineering Platform</span>
           <p className={styles.noticeText}>
-            Asset Registry, Inspection Studio, 3D Structural Health, and Engineering Reports are active.
+            Asset Registry, Photo-First Inspection Studio, 3D Structural Health, and Engineering Reports are active.
             Autonomous Vision Analysis and Decision Engines process telemetry with full audit traceability.
           </p>
         </aside>
-
       </div>
+
+      {/* Asset Registration Modal */}
+      <AssetCreateModal
+        isOpen={isAssetModalOpen}
+        onClose={() => setIsAssetModalOpen(false)}
+      />
     </>
   )
 }

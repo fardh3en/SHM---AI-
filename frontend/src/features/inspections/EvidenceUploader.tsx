@@ -5,6 +5,10 @@ import {
   AlertCircle,
   Camera,
   Check,
+  RefreshCw,
+  Info,
+  CheckCircle2,
+  FolderOpen,
 } from 'lucide-react'
 import type { InspectionSource } from '../../api/inspections'
 import { useAssetEvidence } from '../../hooks/useAssetEvidence'
@@ -31,14 +35,25 @@ interface EvidenceUploaderProps {
   onChangeNotes: (notes: string) => void
   mediaFile: SelectedMediaFile | null
   onSelectMediaFile: (media: SelectedMediaFile | null) => void
+  selectedTags?: string[]
+  onToggleTag?: (tag: string) => void
 }
 
 const SOURCES: { value: InspectionSource; label: string; desc: string }[] = [
-  { value: 'image', label: 'Field Photography', desc: 'Direct high-resolution visual capture' },
-  { value: 'drone', label: 'UAV / Drone Survey', desc: 'Aerial inspection and photogrammetry' },
-  { value: 'manual', label: 'Manual Observation', desc: 'Human structural engineer on-site notes' },
-  { value: 'camera_feed', label: 'Fixed Camera Feed', desc: 'Continuous stationary surveillance frame' },
-  { value: 'video', label: 'Video Footage', desc: 'Motion recording or borescopic survey' },
+  { value: 'image', label: 'Field Photography', desc: 'Standard direct high-resolution visual capture' },
+  { value: 'drone', label: 'UAV / Drone Survey', desc: 'Aerial photogrammetry' },
+  { value: 'manual', label: 'Manual Observation', desc: 'On-site visual engineering observation' },
+  { value: 'camera_feed', label: 'Fixed Camera Feed', desc: 'Stationary monitoring feed' },
+  { value: 'video', label: 'Video Footage', desc: 'Motion recording or borescope' },
+]
+
+const QUICK_OBSERVATION_TAGS = [
+  'Hairline crack (<1mm)',
+  'Wide crack (>2mm)',
+  'Surface spalling',
+  'Water seepage / dampness',
+  'Rust discoloration',
+  'Concrete scaling',
 ]
 
 const MAX_BYTES = 25 * 1024 * 1024 // 25 MB
@@ -58,16 +73,18 @@ export default function EvidenceUploader({
   onChangeNotes,
   mediaFile,
   onSelectMediaFile,
+  selectedTags = [],
+  onToggleTag,
 }: EvidenceUploaderProps) {
   const [isDragOver, setIsDragOver] = useState(false)
   const [validationError, setValidationError] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState<'archive' | 'upload'>('archive')
+  const [showArchive, setShowArchive] = useState(false)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
 
-  // Fetch asset archived visual evidence
+  // Fetch asset archived visual evidence if assetId is set
   const { data: archivedEvidence, isLoading: isEvidenceLoading } = useAssetEvidence(assetId)
 
-  // Revoke object URL on unmount if it was created locally from a File object
+  // Revoke object URL on unmount if it was created locally
   useEffect(() => {
     return () => {
       if (mediaFile?.file && mediaFile.previewUrl.startsWith('blob:')) {
@@ -76,25 +93,19 @@ export default function EvidenceUploader({
     }
   }, [mediaFile])
 
-  // If asset has no archived evidence, default tab to upload
-  useEffect(() => {
-    if (archivedEvidence && archivedEvidence.length === 0 && activeTab === 'archive') {
-      setActiveTab('upload')
-    }
-  }, [archivedEvidence, activeTab])
-
   // Select an archived evidence image
   const handleSelectArchived = (ev: AssetEvidence) => {
     onSelectMediaFile({
       file: undefined,
       previewUrl: ev.file_path,
-      formattedSize: 'Archived',
+      formattedSize: 'Archived File',
       isSampleEvidence: true,
       sampleEvidenceId: ev.id,
       caption: ev.caption,
       classification: ev.classification,
     })
     setValidationError(null)
+    setShowArchive(false)
   }
 
   // Handle local file validation & staging
@@ -103,7 +114,7 @@ export default function EvidenceUploader({
 
     if (!ACCEPTED_TYPES.includes(file.type)) {
       setValidationError(
-        `Unsupported file type (${file.type || 'unknown'}). Supported: JPEG, PNG, WebP, TIFF.`
+        `Unsupported file format (${file.type || 'unknown'}). Supported formats: JPG, PNG, WebP, TIFF.`
       )
       return
     }
@@ -165,99 +176,24 @@ export default function EvidenceUploader({
     }
   }
 
+  const handleReplace = () => {
+    fileInputRef.current?.click()
+  }
+
   const archiveCount = archivedEvidence?.length ?? 0
 
   return (
     <div className={styles.container}>
-      {/* ── Mode Selection Tab Bar ── */}
-      <div className={styles.tabBar}>
-        <button
-          type="button"
-          className={`${styles.tabBtn} ${activeTab === 'archive' ? styles.tabBtnActive : ''}`}
-          onClick={() => setActiveTab('archive')}
-        >
-          <Camera size={14} />
-          <span>Asset Evidence Archive ({isEvidenceLoading ? '…' : archiveCount})</span>
-        </button>
-
-        <button
-          type="button"
-          className={`${styles.tabBtn} ${activeTab === 'upload' ? styles.tabBtnActive : ''}`}
-          onClick={() => setActiveTab('upload')}
-        >
-          <UploadCloud size={14} />
-          <span>Upload Local File</span>
-        </button>
+      {/* ── Guidance Tip ── */}
+      <div className={styles.tipBox} role="note">
+        <Info size={16} style={{ flexShrink: 0, color: 'var(--color-mineral)' }} />
+        <span>
+          <strong>Tip for best AI accuracy:</strong> A clear, focused, and well-lit photograph perpendicular to the crack works best for automated segmentation.
+        </span>
       </div>
 
-      {/* ── Tab 1: Archived Asset Evidence ── */}
-      {activeTab === 'archive' && (
-        <div>
-          {isEvidenceLoading ? (
-            <div style={{ color: 'var(--text-muted)', fontSize: '0.875rem', padding: '12px' }}>
-              Loading archived structural evidence...
-            </div>
-          ) : archiveCount === 0 ? (
-            <div
-              style={{
-                padding: '24px',
-                textAlign: 'center',
-                color: 'var(--text-muted)',
-                fontSize: '0.875rem',
-                border: '1px dashed var(--border-subtle)',
-                borderRadius: 'var(--radius-md)',
-              }}
-            >
-              No archived evidence photographs available for this asset. Switch to "Upload Local File" to ingest a new image.
-            </div>
-          ) : (
-            <div className={styles.archiveGrid}>
-              {archivedEvidence?.map((ev) => {
-                const isSelected =
-                  mediaFile?.previewUrl === ev.file_path ||
-                  mediaFile?.sampleEvidenceId === ev.id
-
-                return (
-                  <div
-                    key={ev.id}
-                    className={`${styles.archiveCard} ${
-                      isSelected ? styles.archiveCardSelected : ''
-                    }`}
-                    onClick={() => handleSelectArchived(ev)}
-                    role="button"
-                    tabIndex={0}
-                  >
-                    <div className={styles.archiveThumbWrap}>
-                      <img
-                        src={ev.file_path}
-                        alt={ev.caption}
-                        className={styles.archiveThumb}
-                        loading="lazy"
-                      />
-                      {isSelected && (
-                        <div className={styles.archiveCheck}>
-                          <Check size={12} />
-                        </div>
-                      )}
-                    </div>
-                    <div className={styles.archiveBody}>
-                      <span className={styles.archiveCaption} title={ev.caption}>
-                        {ev.caption}
-                      </span>
-                      <span className={styles.archiveMeta}>
-                        {ev.classification.replace('_', ' ').toUpperCase()}
-                      </span>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ── Tab 2: Upload New Local File ── */}
-      {activeTab === 'upload' && !mediaFile && (
+      {/* ── Prominent Drag & Drop Zone (Shown when no media staged) ── */}
+      {!mediaFile && (
         <div
           className={`${styles.dropzone} ${isDragOver ? styles.dropzoneActive : ''}`}
           onDragOver={(e) => {
@@ -269,6 +205,7 @@ export default function EvidenceUploader({
           onClick={() => fileInputRef.current?.click()}
           role="button"
           tabIndex={0}
+          aria-label="Upload structural crack image"
         >
           <input
             ref={fileInputRef}
@@ -280,10 +217,21 @@ export default function EvidenceUploader({
           <div className={styles.uploadIconWrap}>
             <UploadCloud size={24} />
           </div>
-          <div className={styles.dropTitle}>Drag and drop structural photograph here</div>
-          <div className={styles.dropSub}>or click to browse local files</div>
+          <div className={styles.dropTitle}>Drag &amp; drop crack photograph here</div>
+          <div className={styles.dropSub}>or click to browse from your device</div>
+          <button
+            type="button"
+            className={styles.chooseBtn}
+            onClick={(e) => {
+              e.stopPropagation()
+              fileInputRef.current?.click()
+            }}
+          >
+            <FolderOpen size={15} />
+            <span>Choose Image</span>
+          </button>
           <div className={styles.dropLimit}>
-            Supported: JPEG, PNG, WebP, TIFF · Max single file: 25 MB
+            Supported: JPEG, PNG, WebP, TIFF · Maximum file size: 25 MB
           </div>
         </div>
       )}
@@ -291,6 +239,13 @@ export default function EvidenceUploader({
       {/* ── Active Staged Media Preview Card ── */}
       {mediaFile && (
         <div className={styles.previewCard}>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".jpg,.jpeg,.png,.webp,.tif,.tiff"
+            className={styles.hiddenInput}
+            onChange={handleInputChange}
+          />
           <div className={styles.previewLeft}>
             <img
               src={mediaFile.previewUrl}
@@ -298,14 +253,15 @@ export default function EvidenceUploader({
               className={styles.thumbImg}
             />
             <div className={styles.fileInfo}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                 <span className={styles.fileName}>
                   {mediaFile.caption ?? (mediaFile.file ? mediaFile.file.name : 'Staged Evidence')}
                 </span>
-                {mediaFile.isSampleEvidence ? (
+                <span className={styles.validationBadge}>
+                  <CheckCircle2 size={12} /> Format &amp; Size Validated
+                </span>
+                {mediaFile.isSampleEvidence && (
                   <span className={styles.samplePill}>Archived Evidence</span>
-                ) : (
-                  <span className={styles.userUploadPill}>Local Upload</span>
                 )}
               </div>
               <div className={styles.fileMeta}>
@@ -328,15 +284,26 @@ export default function EvidenceUploader({
             </div>
           </div>
 
-          <button
-            type="button"
-            className={styles.removeBtn}
-            onClick={handleRemove}
-            title="Remove staged evidence"
-          >
-            <Trash2 size={13} />
-            <span>Remove</span>
-          </button>
+          <div className={styles.previewActions}>
+            <button
+              type="button"
+              className={styles.replaceBtn}
+              onClick={handleReplace}
+              title="Replace current image with another file"
+            >
+              <RefreshCw size={13} />
+              <span>Replace</span>
+            </button>
+            <button
+              type="button"
+              className={styles.removeBtn}
+              onClick={handleRemove}
+              title="Remove staged evidence"
+            >
+              <Trash2 size={13} />
+              <span>Remove</span>
+            </button>
+          </div>
         </div>
       )}
 
@@ -348,15 +315,130 @@ export default function EvidenceUploader({
         </div>
       )}
 
-      {/* ── Capture Parameters & Field Notes Form ── */}
-      <div className={styles.formGrid}>
-        <div className={styles.field}>
+      {/* ── Optional Archive Gallery Drawer (if asset has archived images) ── */}
+      {assetId && archiveCount > 0 && (
+        <div style={{ marginTop: '2px' }}>
+          <button
+            type="button"
+            className={styles.replaceBtn}
+            onClick={() => setShowArchive((prev) => !prev)}
+            style={{ fontSize: '0.75rem', padding: '4px 10px' }}
+          >
+            <Camera size={13} />
+            <span>
+              {showArchive
+                ? 'Hide Archived Evidence Photos'
+                : `Or select from asset evidence archive (${archiveCount} photos)`}
+            </span>
+          </button>
+
+          {showArchive && (
+            <div style={{ marginTop: '8px' }}>
+              {isEvidenceLoading ? (
+                <div style={{ color: 'var(--text-muted)', fontSize: '0.8125rem' }}>
+                  Loading archived structural photos...
+                </div>
+              ) : (
+                <div className={styles.archiveGrid}>
+                  {archivedEvidence?.map((ev) => {
+                    const isSelected =
+                      mediaFile?.previewUrl === ev.file_path ||
+                      mediaFile?.sampleEvidenceId === ev.id
+
+                    return (
+                      <div
+                        key={ev.id}
+                        className={`${styles.archiveCard} ${
+                          isSelected ? styles.archiveCardSelected : ''
+                        }`}
+                        onClick={() => handleSelectArchived(ev)}
+                        role="button"
+                        tabIndex={0}
+                      >
+                        <div className={styles.archiveThumbWrap}>
+                          <img
+                            src={ev.file_path}
+                            alt={ev.caption}
+                            className={styles.archiveThumb}
+                            loading="lazy"
+                          />
+                          {isSelected && (
+                            <div className={styles.archiveCheck}>
+                              <Check size={12} />
+                            </div>
+                          )}
+                        </div>
+                        <div className={styles.archiveBody}>
+                          <span className={styles.archiveCaption} title={ev.caption}>
+                            {ev.caption}
+                          </span>
+                          <span className={styles.archiveMeta}>
+                            {ev.classification.replace('_', ' ').toUpperCase()}
+                          </span>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Quick-Select Observation Tags ── */}
+      {onToggleTag && (
+        <div className={styles.field} style={{ marginTop: '4px' }}>
+          <label className={styles.label}>
+            Quick Field Observation Tags (Optional)
+          </label>
+          <div className={styles.tagList}>
+            {QUICK_OBSERVATION_TAGS.map((tag) => {
+              const isSelected = selectedTags.includes(tag)
+              return (
+                <button
+                  key={tag}
+                  type="button"
+                  className={`${styles.tagBtn} ${isSelected ? styles.tagBtnSelected : ''}`}
+                  onClick={() => onToggleTag(tag)}
+                  aria-pressed={isSelected}
+                >
+                  {isSelected ? `✓ ${tag}` : `+ ${tag}`}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ── Field Notes ── */}
+      <div className={styles.field}>
+        <label htmlFor="inspection-notes-input" className={styles.label}>
+          Field Observations / Context Notes (Optional)
+        </label>
+        <textarea
+          id="inspection-notes-input"
+          className={styles.textarea}
+          placeholder="e.g. South abutment wall, 2 meters above ground level, damp surface condition..."
+          rows={2}
+          value={notes}
+          onChange={(e) => onChangeNotes(e.target.value)}
+        />
+      </div>
+
+      {/* ── Collapsible Advanced Options ── */}
+      <details className={styles.advancedDetails}>
+        <summary className={styles.advancedSummary}>
+          Advanced Ingestion Parameters (Acquisition Modality)
+        </summary>
+        <div style={{ marginTop: '12px' }}>
           <label htmlFor="inspection-source-select" className={styles.label}>
-            Data Acquisition Modality / Source
+            Capture Acquisition Modality
           </label>
           <select
             id="inspection-source-select"
             className={styles.select}
+            style={{ marginTop: '4px' }}
             value={source}
             onChange={(e) => onChangeSource(e.target.value as InspectionSource)}
           >
@@ -367,20 +449,7 @@ export default function EvidenceUploader({
             ))}
           </select>
         </div>
-
-        <div className={`${styles.field} ${styles.fullWidth}`}>
-          <label htmlFor="inspection-notes-input" className={styles.label}>
-            Inspector / Field Observations &amp; Context Notes
-          </label>
-          <textarea
-            id="inspection-notes-input"
-            className={styles.textarea}
-            placeholder="Record ambient weather, structural joint condition, crack morphology, or operational notes..."
-            value={notes}
-            onChange={(e) => onChangeNotes(e.target.value)}
-          />
-        </div>
-      </div>
+      </details>
     </div>
   )
 }
