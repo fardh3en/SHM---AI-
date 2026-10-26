@@ -7,7 +7,10 @@
 
 // Use relative URL so requests route through the Vite dev-server proxy (/api → http://localhost:8000).
 // VITE_API_BASE_URL can be set to an absolute URL in production deployments.
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? ''
+// Normalize base URL: strip whitespace, trailing slashes, and redundant /api or /api/v1 prefixes
+// so endpoint paths starting with /api/v1/ do not accidentally duplicate prefixes.
+const rawBase = (import.meta.env.VITE_API_BASE_URL ?? '').trim().replace(/\/+$/, '')
+export const API_BASE = rawBase.replace(/\/api(\/v1)?\/?$/, '')
 
 export class ApiError extends Error {
   constructor(

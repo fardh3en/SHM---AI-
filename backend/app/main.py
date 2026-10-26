@@ -4,10 +4,10 @@ FastAPI application factory.
 Registers routers, middleware, exception handlers, and lifecycle hooks.
 Configures automatic DB initialization in development environments.
 """
-import os
 import logging
-from contextlib import asynccontextmanager
+import os
 from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -66,9 +66,10 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.ALLOWED_ORIGINS,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origin_regex=settings.ALLOWED_ORIGIN_REGEX,
+    allow_credentials=settings.CORS_ALLOW_CREDENTIALS,
+    allow_methods=settings.CORS_ALLOW_METHODS,
+    allow_headers=settings.CORS_ALLOW_HEADERS,
 )
 
 
@@ -83,13 +84,21 @@ async def shm_exception_handler(request: Request, exc: SHMBaseException) -> JSON
         f"on {request.method} {request.url.path}"
     )
     
-    return JSONResponse(
+    response = JSONResponse(
         status_code=status_code,
         content={
             "detail": exc.message,
             "error_code": exc.error_code,
         },
     )
+    origin = request.headers.get("origin")
+    if origin and settings.is_origin_allowed(origin):
+        response.headers["Access-Control-Allow-Origin"] = origin
+        if settings.CORS_ALLOW_CREDENTIALS:
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+        response.headers["Vary"] = "Origin"
+
+    return response
 
 
 @app.exception_handler(Exception)
@@ -101,13 +110,21 @@ async def generic_exception_handler(request: Request, exc: Exception) -> JSONRes
         exc_info=True
     )
     
-    return JSONResponse(
+    response = JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content={
             "detail": "An unexpected internal server error occurred.",
             "error_code": "INTERNAL_SERVER_ERROR",
         },
     )
+    origin = request.headers.get("origin")
+    if origin and settings.is_origin_allowed(origin):
+        response.headers["Access-Control-Allow-Origin"] = origin
+        if settings.CORS_ALLOW_CREDENTIALS:
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+        response.headers["Vary"] = "Origin"
+
+    return response
 
 
 # ── Static Uploads Mount ──────────────────────────────────────────────────────

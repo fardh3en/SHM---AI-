@@ -5,13 +5,14 @@ All settings are read from environment variables or a .env file.
 Sensitive values (secrets, credentials) should NEVER be hardcoded here —
 always override via environment variables in production.
 """
+import json
+import re
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
-
 
 # Resolve the project root (SHM-AI/) from this file's location
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -44,13 +45,37 @@ class Settings(BaseSettings):
     )
     DEBUG: bool = True
 
-    # ── API ────────────────────────────────────────────────────────────────────
+    # ── API & CORS ─────────────────────────────────────────────────────────────
     API_V1_PREFIX: str = "/api/v1"
-    ALLOWED_ORIGINS: list[str] = [
-        "http://localhost:3000",   # React (future)
-        "http://localhost:8501",   # Streamlit dashboard (Phase 6)
-        "http://localhost:8000",   # API self (for Swagger UI)
+    ALLOWED_ORIGINS: list[str] | str = [
+        "https://shm-ai-silk.vercel.app",
+        "https://shm-p2k5964w-fardh3en.vercel.app",
+        "http://localhost:3000",
+        "http://localhost:5173",
+        "http://localhost:4173",
+        "http://localhost:8000",
+        "http://localhost:8501",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:8000",
+        "http://127.0.0.1:8501",
     ]
+    ALLOWED_ORIGIN_REGEX: str | None = Field(
+        default=r"^https:\/\/.*\.vercel\.app$",
+        description="Regex pattern for dynamic origins (e.g. Vercel preview/branch deployments).",
+    )
+    CORS_ALLOW_CREDENTIALS: bool = Field(
+        default=False,
+        description="Allow credentials (cookies, auth headers) in CORS. Disabled by default.",
+    )
+    CORS_ALLOW_METHODS: list[str] | str = Field(
+        default=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"],
+        description="Allowed HTTP methods for CORS requests.",
+    )
+    CORS_ALLOW_HEADERS: list[str] | str = Field(
+        default=["*"],
+        description="Allowed HTTP headers for CORS requests.",
+    )
 
     # ── Database ───────────────────────────────────────────────────────────────
     DATABASE_URL: str = Field(
@@ -104,11 +129,61 @@ class Settings(BaseSettings):
     )
 
     # ── Validators ─────────────────────────────────────────────────────────────
+    @field_validator("ALLOWED_ORIGINS", "CORS_ALLOW_METHODS", "CORS_ALLOW_HEADERS", mode="before")
+    @classmethod
+    def parse_string_or_list(cls, v: Any) -> list[str]:
+        """
+        Parse comma-separated strings, JSON strings, or lists into a list of strings,
+        stripping whitespace and trailing slashes for origins.
+        """
+        if isinstance(v, str):
+            v = v.strip()
+            if not v:
+                return []
+            if v.startswith("[") and v.endswith("]"):
+                try:
+                    parsed = json.loads(v)
+                    if isinstance(parsed, list):
+                        return [
+                            str(item).strip().rstrip("/")
+                            for item in parsed
+                            if str(item).strip()
+                        ]
+                except Exception:
+                    pass
+            return [item.strip().rstrip("/") for item in v.split(",") if item.strip()]
+        if isinstance(v, (list, tuple, set)):
+            return [str(item).strip().rstrip("/") for item in v if str(item).strip()]
+        return v
+
+    @field_validator("ALLOWED_ORIGIN_REGEX", mode="before")
+    @classmethod
+    def parse_origin_regex(cls, v: Any) -> str | None:
+        """Allow None or empty string to disable regex matching."""
+        if v is None:
+            return None
+        if isinstance(v, str):
+            v = v.strip()
+            if not v or v.lower() in ("none", "null"):
+                return None
+        return str(v)
+
     @field_validator("WEIGHTS_DIR", "REPORTS_DIR", "DATASETS_DIR", "UPLOAD_DIR", mode="before")
     @classmethod
     def coerce_to_path(cls, v: Any) -> Path:
         """Allow string overrides from environment while keeping Path type."""
         return Path(v)
+
+    def is_origin_allowed(self, origin: str | None) -> bool:
+        """Check if an origin is permitted by ALLOWED_ORIGINS or ALLOWED_ORIGIN_REGEX."""
+        if not origin:
+            return False
+        origin_clean = origin.strip().rstrip("/")
+        if "*" in self.ALLOWED_ORIGINS or origin_clean in self.ALLOWED_ORIGINS:
+            return True
+        return bool(
+            self.ALLOWED_ORIGIN_REGEX and re.fullmatch(self.ALLOWED_ORIGIN_REGEX, origin_clean)
+        )
 
     @property
     def default_model_path(self) -> Path:
