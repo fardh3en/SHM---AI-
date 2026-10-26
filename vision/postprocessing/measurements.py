@@ -75,36 +75,25 @@ class MeasurementService:
 
     def _calculate_skeleton_length(self, skel: np.ndarray) -> float:
         """
-        Compute skeleton length by summing pixel step distances.
+        Compute skeleton length by summing pixel step distances vectorially.
         Assigns 1.0 for orthogonal steps, 1.414 for diagonal steps.
+        Avoids heap-allocated Python tuple sets for memory efficiency on cloud containers.
         """
-        # Find coordinates of all active pixels [y, x]
-        y_indices, x_indices = np.where(skel > 0)
-        coords = set(zip(x_indices, y_indices, strict=True))
-        
-        length = 0.0
-        visited_edges = set()
+        bool_skel = (skel > 0)
+        if not np.any(bool_skel):
+            return 0.0
 
-        # 8-neighborhood offsets
-        offsets = [
-            (1, 0, 1.0),   # Right
-            (0, 1, 1.0),   # Down
-            (1, 1, 1.414), # Down-Right
-            (-1, 1, 1.414) # Down-Left
-        ]
+        # Vectorized 8-neighborhood edge count without Python object allocation
+        h_steps = np.count_nonzero(bool_skel[:, :-1] & bool_skel[:, 1:])
+        v_steps = np.count_nonzero(bool_skel[:-1, :] & bool_skel[1:, :])
+        dr_steps = np.count_nonzero(bool_skel[:-1, :-1] & bool_skel[1:, 1:])
+        dl_steps = np.count_nonzero(bool_skel[:-1, 1:] & bool_skel[1:, :-1])
 
-        for cx, cy in coords:
-            for dx, dy, weight in offsets:
-                nx, ny = cx + dx, cy + dy
-                if (nx, ny) in coords:
-                    edge = frozenset({(cx, cy), (nx, ny)})
-                    if edge not in visited_edges:
-                        visited_edges.add(edge)
-                        length += weight
+        length = float(h_steps + v_steps) + float(dr_steps + dl_steps) * 1.414
 
         # If length is completely isolated/dot, fallback to single pixel count
         if length == 0.0:
-            length = float(len(coords))
+            length = float(np.count_nonzero(bool_skel))
 
         return length
 

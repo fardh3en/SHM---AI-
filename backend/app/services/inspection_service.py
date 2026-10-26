@@ -375,6 +375,9 @@ class InspectionService(BaseService):
                 f"[Stage 4: Vision Inference Complete] id={inspection_id!r} in {infer_ms:.1f}ms: "
                 f"{len(detection_results)} detection(s) found"
             )
+            # Reclaim intermediate PyTorch and image memory buffers immediately
+            import gc
+            gc.collect()
         except (InferenceError, ModelNotFoundError) as exc:
             elapsed_ms = (time.perf_counter() - start_time) * 1000
             err_msg = exc.message if hasattr(exc, "message") else str(exc)

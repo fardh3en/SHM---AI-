@@ -94,7 +94,11 @@ class CVInferencePipeline(IInferencePipeline):
         logger.info(f"[Vision Pipeline] Starting pipeline for image: {path.name} ({path})")
 
         try:
-            image = ImageLoader.load_image(path)
+            # In full-frame mode, constrain image dimensions to 1280px to prevent
+            # out-of-memory crashes on constrained containers (Render Free 512MB RAM).
+            # In slicing mode, keep native resolution for tile generation.
+            max_dim = 1280 if not self._slice_if_large else None
+            image = ImageLoader.load_image(path, max_dimension=max_dim)
         except FileNotFoundError as exc:
             raise InferenceError(f"Image file not found: {path}") from exc
         except ValueError as exc:
@@ -226,15 +230,38 @@ class CVInferencePipeline(IInferencePipeline):
             full_mask = ImageSlicer.project_mask(
                 raw.mask, x_off, y_off, img_width, img_height
             )
-            skeleton = Skeletonizer.skeletonize_mask(full_mask)
-            measurement = self._measurement_service.measure_defect(full_mask, skeleton)
+            y_idx, x_idx = np.where(full_mask > 0)
+            if len(y_idx) > 0:
+                # Crop to active bounding box with padding to minimize memory consumption during morphology
+                pad = 4
+                y1 = max(0, int(y_idx.min()) - pad)
+                y2 = min(img_height, int(y_idx.max()) + pad + 1)
+                x1 = max(0, int(x_idx.min()) - pad)
+                x2 = min(img_width, int(x_idx.max()) + pad + 1)
 
-            area_px = measurement.area_px
-            length_px = measurement.length_px
-            width_px = measurement.width_px
-            max_width_px = measurement.max_width_px
-            orientation_deg = measurement.orientation_deg
-            mask_polygon = MaskPolygonConverter.mask_to_polygon(full_mask)
+                crop_mask = full_mask[y1:y2, x1:x2]
+                crop_skel = Skeletonizer.skeletonize_mask(crop_mask)
+                measurement = self._measurement_service.measure_defect(crop_mask, crop_skel)
+
+                area_px = measurement.area_px
+                length_px = measurement.length_px
+                width_px = measurement.width_px
+                max_width_px = measurement.max_width_px
+                orientation_deg = measurement.orientation_deg
+
+                crop_poly = MaskPolygonConverter.mask_to_polygon(crop_mask)
+                if crop_poly and "coordinates" in crop_poly:
+                    mask_polygon = {
+                        "type": "Polygon",
+                        "coordinates": [
+                            [[pt[0] + x1, pt[1] + y1] for pt in ring]
+                            for ring in crop_poly["coordinates"]
+                        ],
+                    }
+                else:
+                    mask_polygon = crop_poly
+            else:
+                area_px = 0.0
         else:
             # No mask available (detector ran in bbox-only mode) — fall back
             # to bounding-box area in pixel space so area_px is never lost.

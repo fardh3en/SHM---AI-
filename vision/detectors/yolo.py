@@ -152,13 +152,17 @@ class YOLO11Detector(IDetector):
             f"iou={self._default_iou}, device={self._device}, threads={threads}"
         )
 
-        raw_results = self._model.predict(
-            source=image,
-            conf=conf,
-            iou=self._default_iou,
-            device=self._device,
-            verbose=False,
-        )
+        # Run inference in strict evaluation mode without autograd gradient tracking
+        inference_ctx = torch.inference_mode if hasattr(torch, "inference_mode") else torch.no_grad
+        with inference_ctx():
+            raw_results = self._model.predict(
+                source=image,
+                conf=conf,
+                iou=self._default_iou,
+                device=self._device,
+                imgsz=640,
+                verbose=False,
+            )
 
         infer_ms = (time.perf_counter() - t0) * 1000
 
@@ -184,6 +188,8 @@ class YOLO11Detector(IDetector):
         # Get class names dictionary from model config
         names_dict = self._model.names
 
+        import cv2
+
         for idx, box in enumerate(result.boxes):
             # Extract box coordinates (pixel coordinates [x1, y1, x2, y2])
             xyxy = box.xyxy[0].cpu().numpy().tolist()
@@ -197,27 +203,15 @@ class YOLO11Detector(IDetector):
             # Extract segment mask if available
             mask_array = None
             if result.masks is not None:
-                # Mask matches image shape in xy coordinates
-                # Stored as float/binary [H, W] mask
                 mask_tensor = result.masks.data[idx]
-                
-                # Resize mask tensor to original image shape if necessary
+                mask_np = (mask_tensor > 0.5).cpu().numpy().astype(np.uint8)
                 h_img, w_img = image.shape[:2]
-                h_mask, w_mask = mask_tensor.shape
+                h_mask, w_mask = mask_np.shape
                 
                 if h_mask != h_img or w_mask != w_img:
-                    # Resize mask to original size using PyTorch interpolate
-                    import torch.nn.functional as F  # noqa: N812
-                    # Reshape to [1, 1, H, W] for interpolation
-                    mask_resized = F.interpolate(
-                        mask_tensor.unsqueeze(0).unsqueeze(0),
-                        size=(h_img, w_img),
-                        mode="bilinear",
-                        align_corners=False
-                    )
-                    mask_array = (mask_resized[0, 0] > 0.5).cpu().numpy().astype(np.uint8)
+                    mask_array = cv2.resize(mask_np, (w_img, h_img), interpolation=cv2.INTER_NEAREST)
                 else:
-                    mask_array = (mask_tensor > 0.5).cpu().numpy().astype(np.uint8)
+                    mask_array = mask_np
 
             detections.append(
                 RawDetection(
