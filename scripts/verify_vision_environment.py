@@ -110,12 +110,12 @@ def verify_vision_environment(verbose: bool = True) -> dict[str, Any]:
     weights_path = settings.default_model_path
 
     if not weights_path.is_file():
-        # Attempt auto-provisioning default nano weights
-        if weights_path.name == "yolo11n-seg.pt":
+        # Attempt auto-provisioning configured weights
+        if weights_path.name in ("yolo11n-seg.pt", "best.pt"):
             try:
                 from scripts.download_weights import download_weights
                 if verbose:
-                    print(f"Provisioning missing default weights '{weights_path.name}'...")
+                    print(f"Provisioning missing weights '{weights_path.name}'...")
                 download_weights(model_name=weights_path.name, assume_yes=True)
             except Exception as dl_err:
                 report["errors"].append(f"Weights auto-provisioning failed: {dl_err}")

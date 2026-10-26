@@ -260,7 +260,9 @@ export default function VisionAnalysisPage() {
             <span className={styles.summaryValue}>
               {selectedInspection.health_score !== null
                 ? `${selectedInspection.health_score.toFixed(1)} / 100`
-                : 'Pending'}
+                : selectedInspection.status === 'completed'
+                  ? 'Unverified'
+                  : 'Pending'}
             </span>
           </div>
         </div>
@@ -298,7 +300,7 @@ export default function VisionAnalysisPage() {
             <div className={styles.viewportHeader}>
               <div className={styles.viewportTitle}>
                 <ScanLine size={14} color="#D8C65A" />
-                <span>YOLO11 Defect Localization &amp; Bounding Boxes</span>
+                <span>Defect Localization &amp; Bounding Boxes</span>
               </div>
 
               <div className={styles.toggleGroup}>
@@ -475,8 +477,8 @@ export default function VisionAnalysisPage() {
         {/* Engineering Provenance Notice */}
         <div className={styles.provenanceNotice} role="note">
           <strong>Computer Vision Architecture Notice:</strong> Defect classifications, bounding box
-          coordinates, and pixel geometries are generated deterministically by the YOLO11 segmentation
-          model (<code className={styles.protocolValCode}>yolo11n-seg.pt</code>). Defect measurements (area, length, average width) are reported in
+          coordinates, and pixel geometries are generated deterministically by the configured vision
+          pipeline. Defect measurements (area, length, average width) are reported in
           pixel space; physical millimeter calibration requires known Ground Sampling Distance (GSD) or
           on-site reference fiducials.
         </div>

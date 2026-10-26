@@ -21,6 +21,15 @@ import pytest
 from scripts.download_weights import MIN_EXPECTED_BYTES, download_weights
 
 
+@pytest.fixture(autouse=True)
+def mock_default_yolo_model():
+    """Default autouse fixture so mock byte downloads satisfy PyTorch/Ultralytics format checks."""
+    mock_model = MagicMock()
+    mock_model.task = "segment"
+    with patch("ultralytics.YOLO", return_value=mock_model):
+        yield mock_model
+
+
 def test_already_valid_weights_file_skips_download(tmp_path: Path):
     """An existing file >= MIN_EXPECTED_BYTES must not trigger network requests when force=False."""
     weights_dir = tmp_path / "weights"
@@ -33,7 +42,7 @@ def test_already_valid_weights_file_skips_download(tmp_path: Path):
         mock_settings.return_value.DEFAULT_MODEL_NAME = "yolo11n-seg.pt"
         mock_settings.return_value.WEIGHTS_DIR = weights_dir
 
-        with patch("urllib.request.urlopen") as mock_urlopen:
+        with patch("urllib.request.OpenerDirector.open") as mock_urlopen:
             success = download_weights(assume_yes=True, force=False)
             assert success is True
             mock_urlopen.assert_not_called()
@@ -57,7 +66,7 @@ def test_corrupted_small_file_triggers_redownload(tmp_path: Path):
         mock_settings.return_value.DEFAULT_MODEL_NAME = "yolo11n-seg.pt"
         mock_settings.return_value.WEIGHTS_DIR = weights_dir
 
-        with patch("urllib.request.urlopen", return_value=mock_resp) as mock_urlopen:
+        with patch("urllib.request.OpenerDirector.open", return_value=mock_resp) as mock_urlopen:
             success = download_weights(assume_yes=True, force=False)
             assert success is True
             mock_urlopen.assert_called_once()
@@ -83,7 +92,7 @@ def test_transient_network_timeout_retries_and_succeeds(tmp_path: Path):
         mock_settings.return_value.WEIGHTS_DIR = weights_dir
 
         with (
-            patch("urllib.request.urlopen", side_effect=[timeout_err, mock_success_resp]) as mock_urlopen,
+            patch("urllib.request.OpenerDirector.open", side_effect=[timeout_err, mock_success_resp]) as mock_urlopen,
             patch("time.sleep") as mock_sleep,
         ):
             success = download_weights(assume_yes=True, max_retries=2, timeout_seconds=15.0)
@@ -117,7 +126,7 @@ def test_transient_http_503_retries_and_succeeds(tmp_path: Path):
         mock_settings.return_value.WEIGHTS_DIR = weights_dir
 
         with (
-            patch("urllib.request.urlopen", side_effect=[http_503_err, mock_success_resp]) as mock_urlopen,
+            patch("urllib.request.OpenerDirector.open", side_effect=[http_503_err, mock_success_resp]) as mock_urlopen,
             patch("time.sleep") as mock_sleep,
         ):
             success = download_weights(assume_yes=True, max_retries=2)
@@ -149,7 +158,7 @@ def test_transient_http_429_retries_and_succeeds(tmp_path: Path):
         mock_settings.return_value.WEIGHTS_DIR = weights_dir
 
         with (
-            patch("urllib.request.urlopen", side_effect=[http_429_err, mock_success_resp]) as mock_urlopen,
+            patch("urllib.request.OpenerDirector.open", side_effect=[http_429_err, mock_success_resp]) as mock_urlopen,
             patch("time.sleep") as mock_sleep,
         ):
             success = download_weights(assume_yes=True, max_retries=2)
@@ -172,7 +181,7 @@ def test_permanent_http_404_aborts_immediately_without_retry(tmp_path: Path):
         mock_settings.return_value.WEIGHTS_DIR = weights_dir
 
         with (
-            patch("urllib.request.urlopen", side_effect=http_404_err) as mock_urlopen,
+            patch("urllib.request.OpenerDirector.open", side_effect=http_404_err) as mock_urlopen,
             patch("time.sleep") as mock_sleep,
         ):
             success = download_weights(assume_yes=True, max_retries=3)
@@ -197,7 +206,7 @@ def test_permanent_http_403_aborts_immediately_without_retry(tmp_path: Path):
         mock_settings.return_value.WEIGHTS_DIR = weights_dir
 
         with (
-            patch("urllib.request.urlopen", side_effect=http_403_err) as mock_urlopen,
+            patch("urllib.request.OpenerDirector.open", side_effect=http_403_err) as mock_urlopen,
             patch("time.sleep") as mock_sleep,
         ):
             success = download_weights(assume_yes=True, max_retries=3)
@@ -221,7 +230,7 @@ def test_forced_replacement_failure_preserves_existing_valid_file(tmp_path: Path
         mock_settings.return_value.WEIGHTS_DIR = weights_dir
 
         with (
-            patch("urllib.request.urlopen", side_effect=timeout_err),
+            patch("urllib.request.OpenerDirector.open", side_effect=timeout_err),
             patch("time.sleep"),
         ):
             success = download_weights(assume_yes=True, force=True, max_retries=2)
@@ -244,7 +253,7 @@ def test_persistent_failure_stops_at_retry_limit_and_cleans_up(tmp_path: Path):
         mock_settings.return_value.WEIGHTS_DIR = weights_dir
 
         with (
-            patch("urllib.request.urlopen", side_effect=timeout_err) as mock_urlopen,
+            patch("urllib.request.OpenerDirector.open", side_effect=timeout_err) as mock_urlopen,
             patch("time.sleep") as mock_sleep,
         ):
             success = download_weights(assume_yes=True, max_retries=3, timeout_seconds=10.0)
@@ -274,7 +283,7 @@ def test_truncated_download_retries_and_rejects(tmp_path: Path):
         mock_settings.return_value.WEIGHTS_DIR = weights_dir
 
         with (
-            patch("urllib.request.urlopen", return_value=mock_resp) as mock_urlopen,
+            patch("urllib.request.OpenerDirector.open", return_value=mock_resp) as mock_urlopen,
             patch("time.sleep") as mock_sleep,
         ):
             success = download_weights(assume_yes=True, max_retries=2)
@@ -284,3 +293,143 @@ def test_truncated_download_retries_and_rejects(tmp_path: Path):
             assert mock_sleep.call_count == 2
             assert not (weights_dir / "yolo11n-seg.pt").exists()
             assert not (weights_dir / "yolo11n-seg.pt.part").exists()
+
+
+def test_huggingface_best_pt_missing_token_fails_clearly(tmp_path: Path):
+    """Attempting to provision candidate model best.pt without HF_TOKEN fails cleanly with diagnostic message."""
+    weights_dir = tmp_path / "weights"
+    weights_dir.mkdir()
+
+    with patch("scripts.download_weights.get_settings") as mock_settings:
+        mock_settings.return_value.DEFAULT_MODEL_NAME = "best.pt"
+        mock_settings.return_value.WEIGHTS_DIR = weights_dir
+
+        with patch.dict("os.environ", {}, clear=True):
+            success = download_weights(model_name="best.pt", assume_yes=True)
+            assert success is False
+            assert not (weights_dir / "best.pt").exists()
+
+
+def test_huggingface_best_pt_with_token_attaches_authorization_header(tmp_path: Path):
+    """When HF_TOKEN is provided, request to Hugging Face includes Bearer authorization."""
+    weights_dir = tmp_path / "weights"
+    weights_dir.mkdir()
+
+    fake_data = b"M" * 1_200_000
+    mock_resp = MagicMock()
+    mock_resp.headers.get.return_value = str(len(fake_data))
+    mock_resp.read.side_effect = [fake_data, b""]
+    mock_resp.__enter__.return_value = mock_resp
+
+    mock_model = MagicMock()
+    mock_model.task = "detect"
+
+    with patch("scripts.download_weights.get_settings") as mock_settings:
+        mock_settings.return_value.DEFAULT_MODEL_NAME = "best.pt"
+        mock_settings.return_value.WEIGHTS_DIR = weights_dir
+
+        with patch.dict("os.environ", {"HF_TOKEN": "hf_secret_test_token_123"}, clear=True):
+            with (
+                patch("urllib.request.OpenerDirector.open", return_value=mock_resp) as mock_open,
+                patch("ultralytics.YOLO", return_value=mock_model),
+            ):
+                success = download_weights(model_name="best.pt", assume_yes=True)
+                assert success is True
+                assert mock_open.called
+                req = mock_open.call_args[0][0]
+                assert "huggingface.co" in req.full_url
+                assert req.headers.get("Authorization") == "Bearer hf_secret_test_token_123"
+                assert (weights_dir / "best.pt").is_file()
+
+
+def test_safe_auth_redirect_handler_strips_auth_header_on_cdn_redirect():
+    """Authorization header is stripped when redirected to an external CDN (e.g. CloudFront/S3)."""
+    from scripts.download_weights import SafeAuthRedirectHandler
+    handler = SafeAuthRedirectHandler()
+    req = urllib.request.Request(
+        "https://huggingface.co/cazzz307/yolov8-crack-detection/resolve/main/best.pt",
+        headers={"Authorization": "Bearer hf_sensitive_token"}
+    )
+    # Simulate 302 redirect to CloudFront
+    cdn_redirect = handler.redirect_request(
+        req, None, 302, "Found", {}, "https://d12345.cloudfront.net/presigned/best.pt?sig=xyz"
+    )
+    assert cdn_redirect is not None
+    assert "Authorization" not in cdn_redirect.headers
+    assert "Authorization" not in cdn_redirect.unredirected_hdrs
+
+
+def test_safe_auth_redirect_handler_preserves_auth_header_on_huggingface_origin():
+    """Authorization header is retained when redirecting within huggingface.co."""
+    from scripts.download_weights import SafeAuthRedirectHandler
+    handler = SafeAuthRedirectHandler()
+    req = urllib.request.Request(
+        "https://huggingface.co/cazzz307/yolov8-crack-detection/resolve/main/best.pt",
+        headers={"Authorization": "Bearer hf_sensitive_token"}
+    )
+    hf_redirect = handler.redirect_request(
+        req, None, 302, "Found", {}, "https://huggingface.co/cazzz307/yolov8-crack-detection/resolve/main/best.pt"
+    )
+    assert hf_redirect is not None
+    assert hf_redirect.headers.get("Authorization") == "Bearer hf_sensitive_token"
+
+
+def test_downloaded_model_task_mismatch_fails_verification(tmp_path: Path):
+    """If downloaded weights do not match the expected task, verification fails."""
+    weights_dir = tmp_path / "weights"
+    weights_dir.mkdir()
+
+    fake_data = b"M" * 1_200_000
+    mock_resp = MagicMock()
+    mock_resp.headers.get.return_value = str(len(fake_data))
+    mock_resp.read.side_effect = [fake_data, b""]
+    mock_resp.__enter__.return_value = mock_resp
+
+    mock_model = MagicMock()
+    # Return classify instead of detect
+    mock_model.task = "classify"
+
+    with patch("scripts.download_weights.get_settings") as mock_settings:
+        mock_settings.return_value.DEFAULT_MODEL_NAME = "best.pt"
+        mock_settings.return_value.WEIGHTS_DIR = weights_dir
+
+        with patch.dict("os.environ", {"HF_TOKEN": "hf_test"}, clear=True):
+            with (
+                patch("urllib.request.OpenerDirector.open", return_value=mock_resp),
+                patch("ultralytics.YOLO", return_value=mock_model),
+            ):
+                success = download_weights(model_name="best.pt", assume_yes=True, max_retries=1)
+                assert success is False
+                assert not (weights_dir / "best.pt").exists()
+
+
+def test_production_default_yolo11n_seg_does_not_require_hf_token(tmp_path: Path):
+    """Production model yolo11n-seg.pt downloads from Ultralytics without requiring HF_TOKEN."""
+    weights_dir = tmp_path / "weights"
+    weights_dir.mkdir()
+
+    fake_data = b"P" * 1_500_000
+    mock_resp = MagicMock()
+    mock_resp.headers.get.return_value = str(len(fake_data))
+    mock_resp.read.side_effect = [fake_data, b""]
+    mock_resp.__enter__.return_value = mock_resp
+
+    mock_model = MagicMock()
+    mock_model.task = "segment"
+
+    with patch("scripts.download_weights.get_settings") as mock_settings:
+        mock_settings.return_value.DEFAULT_MODEL_NAME = "yolo11n-seg.pt"
+        mock_settings.return_value.WEIGHTS_DIR = weights_dir
+
+        with patch.dict("os.environ", {}, clear=True):
+            with (
+                patch("urllib.request.OpenerDirector.open", return_value=mock_resp) as mock_open,
+                patch("ultralytics.YOLO", return_value=mock_model),
+            ):
+                success = download_weights(model_name="yolo11n-seg.pt", assume_yes=True)
+                assert success is True
+                assert mock_open.called
+                req = mock_open.call_args[0][0]
+                assert "github.com/ultralytics" in req.full_url
+                assert "Authorization" not in req.headers
+                assert (weights_dir / "yolo11n-seg.pt").is_file()

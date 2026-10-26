@@ -166,11 +166,23 @@ export default function InspectionFindingsCard({
         <div className={styles.metricCard}>
           <span className={styles.metricLabel}>Health Score</span>
           <div className={styles.metricValue}>
-            {inspection.health_score !== null ? inspection.health_score.toFixed(1) : '—'}
-            {inspection.health_score !== null && <span className={styles.metricUnit}>/ 100</span>}
+            {inspection.health_score !== null ? (
+              <>
+                {inspection.health_score.toFixed(1)}
+                <span className={styles.metricUnit}>/ 100</span>
+              </>
+            ) : inspection.status === 'completed' ? (
+              <span style={{ fontSize: '1rem', color: 'var(--color-brass)' }}>Unverified</span>
+            ) : (
+              '—'
+            )}
           </div>
           <span className={styles.metricSubtitle}>
-            {inspection.health_score !== null ? 'Evaluated integrity score' : 'No score computed'}
+            {inspection.health_score !== null
+              ? 'Evaluated integrity score'
+              : inspection.status === 'completed'
+                ? 'Aperture quantification required'
+                : 'No score computed'}
           </span>
         </div>
 

@@ -1,5 +1,10 @@
 """
-Script to provision YOLO11 segmentation weights for SHM-AI.
+Script to provision YOLO weights for SHM-AI.
+
+Supports:
+1. Default production weights (yolo11n-seg.pt) from Ultralytics official release assets.
+2. Preview crack-specific weights (best.pt) from Hugging Face (cazzz307/yolov8-crack-detection, MIT license)
+   via authenticated user token (HF_TOKEN) or custom private URL (MODEL_WEIGHTS_URL).
 
 Usage:
     python scripts/download_weights.py          # Interactive confirmation
@@ -7,25 +12,53 @@ Usage:
 """
 import argparse
 import http.client
+import os
 import sys
 import time
 import urllib.error
 import urllib.request
 from pathlib import Path
+from urllib.parse import urlparse
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from backend.app.config import get_settings
 
-# Minimum expected file size for YOLO11 nano segmentation weights (~6 MB).
+# Minimum expected file size for YOLO nano weights (~5.5 - 6.2 MB).
 # Any file smaller than 1 MB is considered empty, truncated, or corrupt.
 MIN_EXPECTED_BYTES = 1_000_000
+
+# Upstream repository definitions
+ULTRALYTICS_RELEASE_URL = "https://github.com/ultralytics/assets/releases/download/v8.4.0"
+HF_CRACK_MODEL_NAME = "best.pt"
+HF_CRACK_REPO = "cazzz307/yolov8-crack-detection"
+HF_CRACK_URL = f"https://huggingface.co/{HF_CRACK_REPO}/resolve/main/best.pt"
 
 
 class IncompleteDownloadError(IOError):
     """Raised when a download payload is prematurely terminated or truncated."""
     pass
+
+
+class SafeAuthRedirectHandler(urllib.request.HTTPRedirectHandler):
+    """
+    HTTP redirect handler that preserves Authorization headers ONLY when
+    redirecting within trusted Hugging Face origins (huggingface.co, *.huggingface.co)
+    and strips Authorization headers when redirecting to external CDNs or storage hosts.
+    """
+    TRUSTED_AUTH_HOSTS = ("huggingface.co", "www.huggingface.co")
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        new_req = super().redirect_request(req, fp, code, msg, headers, newurl)
+        if new_req is None:
+            return None
+        target_host = (urlparse(newurl).hostname or "").lower()
+        # Strip credentials if redirect target is not a trusted Hugging Face host
+        if target_host not in self.TRUSTED_AUTH_HOSTS and not target_host.endswith(".huggingface.co"):
+            new_req.headers.pop("Authorization", None)
+            new_req.unredirected_hdrs.pop("Authorization", None)
+        return new_req
 
 
 def _is_transient_network_error(exc: Exception) -> bool:
@@ -42,6 +75,7 @@ def _is_transient_network_error(exc: Exception) -> bool:
 
     Non-transient / Permanent (aborts immediately without retrying):
       - Permanent HTTP errors: HTTP 400, 401, 403, 404, 405, 410, etc.
+      - Format validation failures on completed model files
     """
     if isinstance(exc, urllib.error.HTTPError):
         # Transient HTTP errors: 408, 429, and 500..599
@@ -60,6 +94,49 @@ def _is_transient_network_error(exc: Exception) -> bool:
     return False
 
 
+def _resolve_download_source(target_name: str) -> tuple[str, dict[str, str]]:
+    """
+    Resolve the download URL and request headers for the requested model.
+
+    Returns:
+        tuple[url, headers]
+    """
+    custom_url = os.environ.get("MODEL_WEIGHTS_URL")
+    if custom_url:
+        return custom_url.strip(), {}
+
+    if target_name == HF_CRACK_MODEL_NAME:
+        token = (
+            os.environ.get("HF_TOKEN")
+            or os.environ.get("HUGGINGFACE_TOKEN")
+            or os.environ.get("HUGGING_FACE_HUB_TOKEN")
+        )
+        if not token:
+            print(
+                f"\n[Provisioning Error] Candidate model '{target_name}' requires an authenticated Hugging Face token.\n"
+                f"Repository '{HF_CRACK_REPO}' is gated under the MIT License.\n"
+                "To provision this candidate model in a preview deployment:\n"
+                f"  1. Accept access conditions at https://huggingface.co/{HF_CRACK_REPO}\n"
+                "  2. Set the secret environment variable 'HF_TOKEN' on your Render preview service.",
+                file=sys.stderr,
+            )
+            raise PermissionError(f"Missing HF_TOKEN for candidate model '{target_name}'")
+
+        headers = {
+            "Authorization": f"Bearer {token.strip()}",
+            "User-Agent": "SHM-AI-Provisioner/1.0 (Render-Preview; +https://github.com/fardh3en/SHM---AI-)",
+            "Accept": "application/octet-stream,*/*",
+        }
+        return HF_CRACK_URL, headers
+
+    # Default production model (yolo11n-seg.pt)
+    headers = {
+        "User-Agent": "SHM-AI-Provisioner/1.0 (Render-Build; +https://github.com/fardh3en/SHM---AI-)",
+        "Accept": "application/octet-stream,*/*",
+    }
+    return f"{ULTRALYTICS_RELEASE_URL}/{target_name}", headers
+
+
 def download_weights(
     model_name: str | None = None,
     force: bool = False,
@@ -69,7 +146,7 @@ def download_weights(
     backoff_factor: float = 2.0,
 ) -> bool:
     """
-    Download model weights with bounded retries, exponential backoff, and size verification.
+    Download model weights with bounded retries, exponential backoff, and size/format verification.
 
     Preserves existing valid weight files if replacement fails. Categorizes errors into
     transient (retried) vs permanent (aborted immediately).
@@ -103,12 +180,27 @@ def download_weights(
                 f"({size:,} bytes < {MIN_EXPECTED_BYTES:,} bytes threshold). Re-downloading..."
             )
 
-    url = f"https://github.com/ultralytics/assets/releases/download/v8.4.0/{target_name}"
+    try:
+        url, req_headers = _resolve_download_source(target_name)
+    except PermissionError as perm_err:
+        print(f"Provisioning aborted: {perm_err}", file=sys.stderr)
+        return False
+
+    display_source = (
+        f"Hugging Face ({HF_CRACK_REPO})"
+        if target_name == HF_CRACK_MODEL_NAME and not os.environ.get("MODEL_WEIGHTS_URL")
+        else "Ultralytics GitHub Assets"
+        if "github.com/ultralytics" in url
+        else "Configured Remote URL"
+    )
+
     print(f"Target model:   {target_name}")
-    print(f"Download URL:   {url}")
+    print(f"Download source: {display_source}")
     print(f"Destination:    {dest_path}")
     print("Estimated size: ~6 MB")
     print(f"Retry policy:   up to {max_retries} retries on transient errors, timeout={timeout_seconds}s")
+    if "Authorization" in req_headers:
+        print("Authentication: Bearer token configured (credentials masked)")
 
     if not assume_yes:
         response = input("Proceed with model weight download? [y/N]: ").strip().lower()
@@ -118,6 +210,7 @@ def download_weights(
 
     max_attempts = max(1, max_retries + 1)
     part_path = dest_path.with_name(f"{dest_path.name}.part")
+    opener = urllib.request.build_opener(SafeAuthRedirectHandler)
 
     for attempt in range(1, max_attempts + 1):
         print(f"Downloading {target_name} (attempt {attempt}/{max_attempts})...")
@@ -126,15 +219,9 @@ def download_weights(
             if part_path.exists():
                 part_path.unlink()
 
-            req = urllib.request.Request(
-                url,
-                headers={
-                    "User-Agent": "SHM-AI-Provisioner/1.0 (Render-Build; +https://github.com/fardh3en/SHM---AI-)",
-                    "Accept": "application/octet-stream,*/*",
-                },
-            )
+            req = urllib.request.Request(url, headers=req_headers)
 
-            with urllib.request.urlopen(req, timeout=timeout_seconds) as response:
+            with opener.open(req, timeout=timeout_seconds) as response:
                 total_size_hdr = response.headers.get("Content-Length")
                 total_size = int(total_size_hdr) if total_size_hdr and total_size_hdr.isdigit() else -1
 
@@ -173,18 +260,38 @@ def download_weights(
                     f"Downloaded file size ({part_size:,} bytes) does not match Content-Length header ({total_size:,} bytes)."
                 )
 
+            # ── PyTorch / Ultralytics Model Format & Task Validation ─────────
+            try:
+                from ultralytics import YOLO
+                test_model = YOLO(str(part_path))
+                expected_task = "detect" if target_name == HF_CRACK_MODEL_NAME else "segment"
+                actual_task = str(getattr(test_model, "task", "unknown"))
+                if actual_task != expected_task:
+                    raise ValueError(
+                        f"Model task mismatch: expected '{expected_task}', got '{actual_task}'"
+                    )
+            except Exception as format_err:
+                raise ValueError(
+                    f"Downloaded model weights failed format inspection: {format_err}"
+                ) from format_err
+
             # Atomic swap to target destination (leaves existing dest_path intact until verified)
             part_path.replace(dest_path)
             print(f"Download complete and verified on disk at '{dest_path}' ({part_size:,} bytes).")
             print(
-                "[Model Integrity Notice] Verified file size against expected threshold and Content-Length. "
+                "[Model Integrity Notice] Verified file size and model format architecture via PyTorch/Ultralytics. "
                 "Upstream distributor does not publish cryptographic checksums for this release; "
-                "structural verification is completed via model format loading inspection."
+                "integrity is established through format task loading and byte size thresholds."
             )
             return True
 
         except Exception as exc:
-            print(f"\nDownload attempt {attempt}/{max_attempts} failed: {exc}", file=sys.stderr)
+            # Mask any credentials if present in exception string
+            exc_str = str(exc)
+            if "Bearer" in exc_str:
+                exc_str = "[Authorization Bearer masked]"
+
+            print(f"\nDownload attempt {attempt}/{max_attempts} failed: {exc_str}", file=sys.stderr)
             if part_path.exists():
                 try:
                     part_path.unlink()
@@ -194,7 +301,7 @@ def download_weights(
             is_transient = _is_transient_network_error(exc)
             if not is_transient:
                 print(
-                    f"Permanent error encountered ({exc}). Aborting download without further retries.",
+                    f"Permanent error encountered ({exc_str}). Aborting download without further retries.",
                     file=sys.stderr,
                 )
                 return False
@@ -202,7 +309,7 @@ def download_weights(
             if attempt < max_attempts:
                 sleep_time = min(30.0, backoff_factor ** (attempt - 1))
                 print(
-                    f"Retrying in {sleep_time:.1f}s (transient error recovery: {exc})...",
+                    f"Retrying in {sleep_time:.1f}s (transient error recovery)...",
                     file=sys.stderr,
                 )
                 time.sleep(sleep_time)
@@ -217,7 +324,7 @@ def download_weights(
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Download YOLO11 segmentation weights for SHM-AI.")
+    parser = argparse.ArgumentParser(description="Download YOLO weights for SHM-AI.")
     parser.add_argument("--model", type=str, default=None, help="Model filename (default: from config)")
     parser.add_argument("--force", action="store_true", help="Force re-download even if weights exist")
     parser.add_argument("-y", "--yes", action="store_true", help="Assume yes without interactive prompt")
