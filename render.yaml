@@ -2,7 +2,7 @@ services:
   - type: web
     name: infralytiq
     runtime: python
-    buildCommand: "pip install -r requirements.txt && python scripts/download_weights.py --yes"
+    buildCommand: "bash scripts/render_build.sh"
     startCommand: "uvicorn backend.app.main:app --host 0.0.0.0 --port $PORT"
     envVars:
       - key: PYTHON_VERSION

@@ -19,6 +19,7 @@ opencv-python-headless>=4.10.0
 shapely>=2.0.0
 scipy>=1.14.0
 scikit-image>=0.24.0
+networkx>=3.3.0
 
 # Deep Learning Vision Engine (CPU-optimized for cloud instances)
 torch>=2.4.0

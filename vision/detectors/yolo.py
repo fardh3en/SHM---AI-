@@ -7,12 +7,16 @@ from typing import Any, cast
 
 import numpy as np
 
+_ULTRALYTICS_AVAILABLE: bool = False
+_ULTRALYTICS_IMPORT_ERROR: Exception | None = None
+
 try:
     import torch
     from ultralytics import YOLO  # type: ignore[attr-defined]
     _ULTRALYTICS_AVAILABLE = True
-except ImportError:
+except Exception as _import_exc:
     _ULTRALYTICS_AVAILABLE = False
+    _ULTRALYTICS_IMPORT_ERROR = _import_exc
 
 from backend.app.core.exceptions import ModelNotFoundError
 from backend.app.models.detection import DefectType
@@ -57,10 +61,11 @@ class YOLO11Detector(IDetector):
             default_iou: Default IOU threshold for NMS.
         """
         if not _ULTRALYTICS_AVAILABLE:
+            detail = f" (Original error: {_ULTRALYTICS_IMPORT_ERROR})" if _ULTRALYTICS_IMPORT_ERROR else ""
             raise ImportError(
-                "Ultralytics and PyTorch are required for YOLO11Detector. "
+                f"Ultralytics and PyTorch are required for YOLO11Detector{detail}. "
                 "Install them using pip install -e '.[vision]'"
-            )
+            ) from _ULTRALYTICS_IMPORT_ERROR
 
         self._model_path = Path(model_path)
         self._default_conf = default_conf

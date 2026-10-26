@@ -143,3 +143,70 @@ def test_yolo_detector_auto_provisioning_trigger(tmp_path: Path) -> None:
         assert detector is not None
         mock_dl.assert_called_once()
         mock_yolo.assert_called_once_with(str(missing_default_weights))
+
+
+def test_yolo_detector_surfaces_underlying_import_error(tmp_path: Path) -> None:
+    """Verify that YOLO11Detector preserves and surfaces the exact original import error."""
+    fake_weights = tmp_path / "model.pt"
+    fake_weights.touch()
+
+    original_error = ImportError("libGL.so.1: cannot open shared object file: No such file or directory")
+
+    with (
+        patch("vision.detectors.yolo._ULTRALYTICS_AVAILABLE", False),
+        patch("vision.detectors.yolo._ULTRALYTICS_IMPORT_ERROR", original_error),
+    ):
+        with pytest.raises(ImportError) as exc_info:
+            YOLO11Detector(model_path=fake_weights)
+
+        # Must retain original cause and error message
+        assert "libGL.so.1" in str(exc_info.value)
+        assert exc_info.value.__cause__ is original_error
+
+
+def test_verify_vision_environment_returns_healthy() -> None:
+    """Verify verify_vision_environment utility passes and captures package versions."""
+    from scripts.verify_vision_environment import verify_vision_environment
+
+    report = verify_vision_environment(verbose=False)
+    assert report["healthy"] is True
+    assert "numpy" in report["versions"]
+    assert "Pillow" in report["versions"]
+    assert "cv2" in report["versions"]
+    assert "torch" in report["versions"]
+    assert "torchvision" in report["versions"]
+    assert "ultralytics" in report["versions"]
+    assert report["device"] in ("cpu", "cuda")
+    assert report["model_file"] is not None
+
+
+def test_render_build_script_exists_and_configured() -> None:
+    """Verify scripts/render_build.sh exists and contains essential production build steps."""
+    script_path = Path(__file__).resolve().parent.parent.parent / "scripts" / "render_build.sh"
+    assert script_path.is_file()
+
+    content = script_path.read_text(encoding="utf-8")
+    assert "download.pytorch.org/whl/cpu" in content
+    assert "opencv-python-headless" in content
+    assert "opencv-python" in content
+    assert "verify_vision_environment.py" in content
+    assert "download_weights.py" in content
+
+
+def test_system_info_endpoint_includes_vision_runtime() -> None:
+    """Verify /api/v1/system/info returns safe vision runtime diagnostics without leaking secrets."""
+    from starlette.testclient import TestClient
+    from backend.app.main import app
+
+    client = TestClient(app)
+    response = client.get("/api/v1/system/info")
+    assert response.status_code == 200
+
+    data = response.json()
+    assert "vision_runtime" in data
+    vr = data["vision_runtime"]
+    assert "healthy" in vr
+    assert vr["healthy"] is True
+    assert "torch" in vr["versions"]
+    assert "ultralytics" in vr["versions"]
+

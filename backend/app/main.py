@@ -46,6 +46,27 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     if not settings.is_production:
         await create_db_and_tables()
 
+    # Safe startup verification of core vision runtime environment
+    try:
+        from scripts.verify_vision_environment import verify_vision_environment
+        vision_report = verify_vision_environment(verbose=False)
+        if vision_report.get("healthy"):
+            logger.info(
+                "Vision runtime verified: torch=%s (device=%s), ultralytics=%s, cv2=%s, model=%s",
+                vision_report["versions"].get("torch"),
+                vision_report.get("device"),
+                vision_report["versions"].get("ultralytics"),
+                vision_report["versions"].get("cv2"),
+                vision_report.get("model_file"),
+            )
+        else:
+            logger.warning(
+                "Vision runtime incomplete at startup: %s. Vision inference will fail until dependencies/weights are provisioned.",
+                "; ".join(vision_report.get("errors", [])),
+            )
+    except Exception as v_err:
+        logger.warning("Vision environment check encountered unexpected error: %s", v_err)
+
     yield
 
     logger.info("Shutting down SHM-AI Platform backend service...")

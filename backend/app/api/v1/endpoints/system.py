@@ -48,6 +48,18 @@ async def health_check() -> dict:
 )
 async def platform_info() -> dict:
     """Extended platform and version information."""
+    try:
+        from scripts.verify_vision_environment import verify_vision_environment
+        vision_status = verify_vision_environment(verbose=False)
+        vision_info = {
+            "healthy": vision_status.get("healthy", False),
+            "device": vision_status.get("device"),
+            "versions": vision_status.get("versions", {}),
+            "model_task": vision_status.get("model_task"),
+        }
+    except Exception:
+        vision_info = {"healthy": False, "device": "unknown"}
+
     return {
         "app_name": _settings.APP_NAME,
         "version": _settings.APP_VERSION,
@@ -59,4 +71,5 @@ async def platform_info() -> dict:
         "api_prefix": _settings.API_V1_PREFIX,
         "default_model": _settings.DEFAULT_MODEL_NAME,
         "inference_device": _settings.INFERENCE_DEVICE,
+        "vision_runtime": vision_info,
     }
