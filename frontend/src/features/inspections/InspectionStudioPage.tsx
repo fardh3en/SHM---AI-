@@ -26,6 +26,7 @@ import {
 } from '../../hooks/useInspections'
 import type { Asset } from '../../api/assets'
 import type { Inspection, InspectionSource } from '../../api/inspections'
+import { evidenceApi } from '../../api/evidence'
 import styles from './InspectionStudioPage.module.css'
 
 type Step = 1 | 2 | 3 | 4
@@ -87,8 +88,9 @@ export default function InspectionStudioPage() {
     }
   }, [preloadedAsset, selectedAsset, initialEvidencePath])
 
+  const [isUploading, setIsUploading] = useState(false)
   const isSubmitting =
-    createMutation.isPending || updateMutation.isPending || runMutation.isPending
+    isUploading || createMutation.isPending || updateMutation.isPending || runMutation.isPending
 
   // Handle Form Submission
   const handleSubmitInspection = async () => {
@@ -97,15 +99,31 @@ export default function InspectionStudioPage() {
 
     try {
       let currentInspection: Inspection
+      let inputPath: string | undefined = undefined
+
+      if (mediaFile) {
+        if (mediaFile.isSampleEvidence) {
+          inputPath = mediaFile.previewUrl
+        } else if (mediaFile.file) {
+          setIsUploading(true)
+          try {
+            const uploadRes = await evidenceApi.upload(
+              mediaFile.file,
+              selectedAsset.id,
+              notes.trim() || mediaFile.caption || mediaFile.file.name
+            )
+            inputPath = uploadRes.file_path
+          } catch (uploadErr: unknown) {
+            const msg = uploadErr instanceof Error ? uploadErr.message : 'Upload failed'
+            throw new Error(`Evidence image upload failed: ${msg}`)
+          } finally {
+            setIsUploading(false)
+          }
+        }
+      }
 
       if (retryInspectionId) {
         // Updating existing inspection with newly attached evidence
-        const inputPath = mediaFile
-          ? (mediaFile.isSampleEvidence
-              ? mediaFile.previewUrl
-              : `/uploads/${mediaFile.file ? mediaFile.file.name : 'upload.jpg'}`)
-          : undefined
-
         currentInspection = await updateMutation.mutateAsync({
           id: retryInspectionId,
           data: {
@@ -117,28 +135,15 @@ export default function InspectionStudioPage() {
         })
       } else {
         // 1. Create base inspection record
-        const created = await createMutation.mutateAsync({
+        currentInspection = await createMutation.mutateAsync({
           asset_id: selectedAsset.id,
           source,
+          input_path: inputPath,
           notes: notes.trim() || undefined,
         })
-
-        currentInspection = created
-
-        // 2. If a media file was staged, record its input_path
-        if (mediaFile) {
-          const inputPath = mediaFile.isSampleEvidence
-            ? mediaFile.previewUrl
-            : `/uploads/${mediaFile.file ? mediaFile.file.name : 'upload.jpg'}`
-
-          currentInspection = await updateMutation.mutateAsync({
-            id: created.id,
-            data: { input_path: inputPath },
-          })
-        }
       }
 
-      // 3. Trigger vision pipeline if selected
+      // 2. Trigger vision pipeline if selected
       if (triggerVisionPipeline) {
         try {
           const runResult = await runMutation.mutateAsync(currentInspection.id)
@@ -520,7 +525,11 @@ export default function InspectionStudioPage() {
                   {isSubmitting ? (
                     <>
                       <Loader2 size={16} className="spin" style={{ animation: 'spin 1s linear infinite' }} />{' '}
-                      {retryInspectionId ? 'Updating & Analyzing...' : 'Registering & Analyzing...'}
+                      {isUploading
+                        ? 'Uploading Evidence Image...'
+                        : retryInspectionId
+                        ? 'Updating & Analyzing...'
+                        : 'Registering & Analyzing...'}
                     </>
                   ) : (
                     <>

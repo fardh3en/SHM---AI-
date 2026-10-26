@@ -242,20 +242,27 @@ class InspectionService(BaseService):
     def _resolve_input_path(input_path: str) -> Path:
         """Resolve a stored inspection input_path (web URI or filesystem path) to a disk Path."""
         settings = get_settings()
+        if input_path.startswith(("http://", "https://")):
+            from urllib.parse import urlparse
+            input_path = urlparse(input_path).path
+
         p = Path(input_path)
         if p.is_file():
             return p
         clean = input_path.strip().lstrip("/")
+        upload_resolved = settings.UPLOAD_DIR.resolve()
+        base_resolved = settings.BASE_DIR.resolve()
+
         if clean.startswith("uploads/"):
             sub = clean[len("uploads/"):]
             candidate = (settings.UPLOAD_DIR / sub).resolve()
-            if candidate.is_file():
+            if candidate.is_file() and candidate.is_relative_to(upload_resolved):
                 return candidate
         candidate2 = (settings.UPLOAD_DIR / clean).resolve()
-        if candidate2.is_file():
+        if candidate2.is_file() and candidate2.is_relative_to(upload_resolved):
             return candidate2
         candidate3 = (settings.BASE_DIR / clean).resolve()
-        if candidate3.is_file():
+        if candidate3.is_file() and candidate3.is_relative_to(base_resolved):
             return candidate3
         return p
 

@@ -2,6 +2,7 @@
 Pydantic schemas for AssetEvidence API endpoints.
 """
 from datetime import datetime
+
 from pydantic import Field
 
 from backend.app.models.asset_evidence import EvidenceClassification
@@ -42,3 +43,35 @@ class AssetEvidenceResponse(SHMBaseSchema):
     is_sample: bool
     created_at: datetime
     updated_at: datetime
+
+
+class EvidenceUploadResponse(SHMBaseSchema):
+    """Response returned upon successful evidence file upload."""
+    id: str | None = Field(
+        default=None,
+        description="UUID of created AssetEvidence record if linked to an asset.",
+    )
+    asset_id: str | None = Field(
+        default=None,
+        description="Parent asset UUID if provided.",
+    )
+    filename: str = Field(
+        ...,
+        description="Unique filename persisted on the server.",
+    )
+    original_filename: str = Field(
+        ...,
+        description="Original client-supplied filename.",
+    )
+    file_path: str = Field(
+        ...,
+        description="Accessible relative web path, e.g. /uploads/evidence/...",
+    )
+    content_type: str = Field(
+        ...,
+        description="MIME content type of the file.",
+    )
+    size_bytes: int = Field(
+        ...,
+        description="Total file size in bytes.",
+    )

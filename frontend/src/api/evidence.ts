@@ -1,7 +1,7 @@
 /**
  * Evidence API — /api/v1/assets/{asset_id}/evidence & /api/v1/evidence/{id}
  */
-import { apiGet, apiPost } from './client'
+import { apiGet, apiPost, apiUpload } from './client'
 
 export type EvidenceClassification =
   | 'verified_structure'
@@ -38,6 +38,16 @@ export interface AssetEvidenceCreate {
   is_sample?: boolean
 }
 
+export interface EvidenceUploadResponse {
+  id?: string | null
+  asset_id?: string | null
+  filename: string
+  original_filename: string
+  file_path: string
+  content_type: string
+  size_bytes: number
+}
+
 export const evidenceApi = {
   listForAsset: (assetId: string) =>
     apiGet<AssetEvidence[]>(`/api/v1/assets/${assetId}/evidence`),
@@ -47,4 +57,19 @@ export const evidenceApi = {
 
   create: (assetId: string, data: AssetEvidenceCreate) =>
     apiPost<AssetEvidence>(`/api/v1/assets/${assetId}/evidence`, data),
+
+  upload: async (
+    file: File,
+    assetId?: string,
+    caption?: string,
+    classification?: EvidenceClassification
+  ): Promise<EvidenceUploadResponse> => {
+    const formData = new FormData()
+    formData.append('file', file)
+    if (assetId) formData.append('asset_id', assetId)
+    if (caption) formData.append('caption', caption)
+    if (classification) formData.append('classification', classification)
+
+    return apiUpload<EvidenceUploadResponse>('/api/v1/evidence/upload', formData)
+  },
 }

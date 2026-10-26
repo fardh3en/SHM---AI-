@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import type { Asset } from '../../api/assets'
 import type { Inspection } from '../../api/inspections'
+import { resolveMediaUrl } from '../../api/client'
 import type { StructuralComponentData } from './models/types'
 import { useAssetEvidence } from '../../hooks/useAssetEvidence'
 import {
@@ -138,7 +139,7 @@ export default function ComponentDetailPanel({
                     title={item.caption}
                   >
                     <img
-                      src={item.file_path}
+                      src={resolveMediaUrl(item.file_path)}
                       alt={item.caption}
                       className={styles.evidenceImg}
                       loading="lazy"
@@ -324,7 +325,7 @@ export default function ComponentDetailPanel({
                   title={`Click to expand: ${item.caption}`}
                 >
                   <img
-                    src={item.file_path}
+                    src={resolveMediaUrl(item.file_path)}
                     alt={item.caption}
                     className={styles.evidenceImg}
                     loading="lazy"
@@ -356,7 +357,7 @@ export default function ComponentDetailPanel({
         >
           <div className={styles.lightboxModal} onClick={(e) => e.stopPropagation()}>
             <div className={styles.lightboxImageWrapper}>
-              <img src={selectedPhoto} alt="Structural Evidence" className={styles.lightboxImage} />
+              <img src={resolveMediaUrl(selectedPhoto)} alt="Structural Evidence" className={styles.lightboxImage} />
             </div>
             <div className={styles.lightboxFooter}>
               <span>{component.name} — Field Inspection Evidence</span>

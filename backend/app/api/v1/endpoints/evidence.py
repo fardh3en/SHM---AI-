@@ -1,15 +1,113 @@
 """
 Asset evidence API endpoints.
 """
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile, status
 
+from backend.app.core.exceptions import SHMBaseException
 from backend.app.dependencies import EvidenceServiceDep
+from backend.app.models.asset_evidence import EvidenceClassification
 from backend.app.schemas.asset_evidence import (
     AssetEvidenceCreate,
     AssetEvidenceResponse,
+    EvidenceUploadResponse,
 )
 
 router = APIRouter(tags=["Evidence"])
+
+
+@router.post(
+    "/evidence/upload",
+    response_model=EvidenceUploadResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Upload inspection evidence image",
+    description=(
+        "Accepts multipart/form-data image bytes, validates file integrity, "
+        "persists to the server uploads repository, and optionally links to an asset."
+    ),
+    responses={
+        400: {"description": "Invalid file format, empty file, or path traversal"},
+        413: {"description": "File exceeds 25 MB limit"},
+    },
+)
+async def upload_evidence(
+    file: UploadFile = File(..., description="Inspection image file (JPEG, PNG, WebP, TIFF)."),
+    asset_id: str | None = Form(default=None, description="Optional associated asset UUID."),
+    caption: str | None = Form(default=None, description="Optional caption or note."),
+    classification: EvidenceClassification = Form(
+        default=EvidenceClassification.VERIFIED_STRUCTURE,
+        description="Evidence classification.",
+    ),
+    service: EvidenceServiceDep = None,
+) -> EvidenceUploadResponse:
+    """Upload an inspection evidence image file directly."""
+    try:
+        file_path, filename, size_bytes, record = await service.upload_evidence_file(
+            file=file,
+            asset_id=asset_id,
+            caption=caption,
+            classification=classification,
+        )
+    except SHMBaseException as exc:
+        raise HTTPException(status_code=exc.http_status, detail=exc.message) from exc
+
+    return EvidenceUploadResponse(
+        id=record.id if record else None,
+        asset_id=asset_id if record else None,
+        filename=filename,
+        original_filename=file.filename or filename,
+        file_path=file_path,
+        content_type=file.content_type or "application/octet-stream",
+        size_bytes=size_bytes,
+    )
+
+
+@router.post(
+    "/assets/{asset_id}/evidence/upload",
+    response_model=EvidenceUploadResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Upload evidence photo directly for a specific asset",
+    description="Uploads visual media and links it to the specified structural asset.",
+    responses={
+        400: {"description": "Invalid file format or empty file"},
+        404: {"description": "Asset not found"},
+    },
+)
+async def upload_asset_evidence(
+    asset_id: str,
+    file: UploadFile = File(..., description="Inspection image file (JPEG, PNG, WebP, TIFF)."),
+    caption: str | None = Form(default=None, description="Optional caption."),
+    classification: EvidenceClassification = Form(
+        default=EvidenceClassification.VERIFIED_STRUCTURE,
+    ),
+    service: EvidenceServiceDep = None,
+) -> EvidenceUploadResponse:
+    """Upload and attach an evidence image to a specific asset."""
+    asset = await service.get_asset(asset_id)
+    if asset is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Asset '{asset_id}' not found.",
+        )
+
+    try:
+        file_path, filename, size_bytes, record = await service.upload_evidence_file(
+            file=file,
+            asset_id=asset_id,
+            caption=caption,
+            classification=classification,
+        )
+    except SHMBaseException as exc:
+        raise HTTPException(status_code=exc.http_status, detail=exc.message) from exc
+
+    return EvidenceUploadResponse(
+        id=record.id if record else None,
+        asset_id=asset_id,
+        filename=filename,
+        original_filename=file.filename or filename,
+        file_path=file_path,
+        content_type=file.content_type or "application/octet-stream",
+        size_bytes=size_bytes,
+    )
 
 
 @router.get(

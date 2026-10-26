@@ -12,6 +12,25 @@
 const rawBase = (import.meta.env.VITE_API_BASE_URL ?? '').trim().replace(/\/+$/, '')
 export const API_BASE = rawBase.replace(/\/api(\/v1)?\/?$/, '')
 
+/**
+ * Resolves an evidence or media path to an absolute or proxy-relative URL.
+ * If running on a deployed frontend (Vercel) where API_BASE is set,
+ * prefixes relative paths (/uploads/...) with API_BASE.
+ */
+export function resolveMediaUrl(path: string | null | undefined): string {
+  if (!path) return ''
+  if (
+    path.startsWith('http://') ||
+    path.startsWith('https://') ||
+    path.startsWith('blob:') ||
+    path.startsWith('data:')
+  ) {
+    return path
+  }
+  const cleanPath = path.startsWith('/') ? path : `/${path}`
+  return `${API_BASE}${cleanPath}`
+}
+
 export class ApiError extends Error {
   constructor(
     public readonly status: number,
@@ -74,3 +93,50 @@ export const apiPatch = <T>(path: string, body: unknown) =>
   apiFetch<T>(path, { method: 'PATCH', body: JSON.stringify(body) })
 export const apiDelete = <T>(path: string) =>
   apiFetch<T>(path, { method: 'DELETE' })
+
+/**
+ * Uploads multipart/form-data payload (e.g. file objects) without forcing Content-Type header,
+ * enabling the browser to automatically include the multipart boundary.
+ */
+export async function apiUpload<T>(path: string, formData: FormData): Promise<T> {
+  const url = `${API_BASE}${path}`
+
+  let response: Response
+  try {
+    response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+      },
+      body: formData,
+    })
+  } catch {
+    throw new ApiError(0, 'Network error — is the backend running?', 'NETWORK_ERROR')
+  }
+
+  if (!response.ok) {
+    let detail = `HTTP ${response.status}`
+    let errorCode: string | undefined
+    try {
+      const body = await response.json()
+      if (Array.isArray(body.detail)) {
+        detail = body.detail
+          .map((item: { msg?: string; loc?: (string | number)[] }) => {
+            const field = item.loc ? item.loc[item.loc.length - 1] : undefined
+            return field ? `${String(field)}: ${item.msg ?? 'Invalid value'}` : (item.msg ?? JSON.stringify(item))
+          })
+          .join('; ')
+      } else if (typeof body.detail === 'string') {
+        detail = body.detail
+      } else if (body.detail) {
+        detail = JSON.stringify(body.detail)
+      }
+      errorCode = body.error_code
+    } catch {
+      // ignore JSON parse failure
+    }
+    throw new ApiError(response.status, detail, errorCode)
+  }
+
+  return response.json() as Promise<T>
+}

@@ -15,6 +15,7 @@ import EmptyState from '../../components/ui/EmptyState'
 import LoadingState from '../../components/ui/LoadingState'
 import { useAssetEvidence } from '../../hooks/useAssetEvidence'
 import type { AssetEvidence, EvidenceClassification } from '../../api/evidence'
+import { resolveMediaUrl } from '../../api/client'
 import styles from './AssetEvidenceGallery.module.css'
 
 interface AssetEvidenceGalleryProps {
@@ -142,7 +143,7 @@ export default function AssetEvidenceGallery({ assetId, assetName }: AssetEviden
                     </div>
                   ) : (
                     <img
-                      src={ev.file_path}
+                      src={resolveMediaUrl(ev.file_path)}
                       alt={ev.caption}
                       className={styles.image}
                       loading="lazy"
@@ -256,7 +257,7 @@ export default function AssetEvidenceGallery({ assetId, assetName }: AssetEviden
 
             <div className={styles.modalImageWrap}>
               <img
-                src={activeModalEvidence.file_path}
+                src={resolveMediaUrl(activeModalEvidence.file_path)}
                 alt={activeModalEvidence.caption}
                 className={styles.modalImage}
               />

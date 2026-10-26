@@ -26,6 +26,7 @@ export interface Inspection {
 export interface InspectionCreate {
   asset_id: string
   source?: InspectionSource
+  input_path?: string | null
   notes?: string
 }
 

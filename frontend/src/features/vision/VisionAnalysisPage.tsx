@@ -5,6 +5,7 @@ import { useInspections } from '../../hooks/useInspections'
 import { useAssets } from '../../hooks/useAssets'
 import { useInspectionDetections } from '../../hooks/useDetections'
 import { inspectionsApi } from '../../api/inspections'
+import { resolveMediaUrl } from '../../api/client'
 import PageHeader from '../../components/layout/PageHeader'
 import LoadingState from '../../components/ui/LoadingState'
 import ErrorState from '../../components/ui/ErrorState'
@@ -263,7 +264,7 @@ export default function VisionAnalysisPage() {
             <div className={styles.imageCanvasWrapper}>
               {selectedInspection.input_path ? (
                 <img
-                  src={selectedInspection.input_path}
+                  src={resolveMediaUrl(selectedInspection.input_path)}
                   alt="Raw structural inspection evidence"
                   className={styles.displayImage}
                 />
@@ -306,7 +307,7 @@ export default function VisionAnalysisPage() {
               {selectedInspection.input_path ? (
                 <>
                   <img
-                    src={selectedInspection.input_path}
+                    src={resolveMediaUrl(selectedInspection.input_path)}
                     alt="Analyzed structural evidence with defect overlays"
                     className={styles.displayImage}
                   />

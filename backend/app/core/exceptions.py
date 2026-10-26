@@ -41,6 +41,15 @@ class ValidationError(SHMBaseException):
         super().__init__(message=message, error_code="VALIDATION_ERROR")
 
 
+class InvalidFileError(SHMBaseException):
+    """Raised when an uploaded file is invalid, unsupported, empty, or exceeds size limits."""
+
+    http_status = HTTPStatus.BAD_REQUEST
+
+    def __init__(self, message: str) -> None:
+        super().__init__(message=message, error_code="INVALID_FILE")
+
+
 class InferenceError(SHMBaseException):
     """Raised when the computer vision inference pipeline fails."""
 
