@@ -79,6 +79,12 @@ export default function HeroInspectionAction({ onOpenAssetModal }: HeroInspectio
         onDragLeave={() => setIsDragOver(false)}
         onDrop={handleDrop}
         onClick={() => fileInputRef.current?.click()}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            fileInputRef.current?.click()
+          }
+        }}
         role="button"
         tabIndex={0}
         aria-label="Upload crack image directly from dashboard"
@@ -88,6 +94,9 @@ export default function HeroInspectionAction({ onOpenAssetModal }: HeroInspectio
           type="file"
           accept=".jpg,.jpeg,.png,.webp,.tif,.tiff"
           className={styles.hiddenInput}
+          style={{ display: 'none' }}
+          tabIndex={-1}
+          aria-hidden="true"
           onChange={handleInputChange}
         />
         <div className={styles.dropzoneIconWrap}>

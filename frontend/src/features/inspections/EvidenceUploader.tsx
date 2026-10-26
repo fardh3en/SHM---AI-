@@ -184,6 +184,19 @@ export default function EvidenceUploader({
 
   return (
     <div className={styles.container}>
+      {/* ── Single Hidden File Input (controlled via ref by dropzone, chooseBtn, and replaceBtn) ── */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".jpg,.jpeg,.png,.webp,.tif,.tiff"
+        className={styles.hiddenInput}
+        style={{ display: 'none' }}
+        onChange={handleInputChange}
+        tabIndex={-1}
+        aria-hidden="true"
+        data-testid="evidence-file-input"
+      />
+
       {/* ── Guidance Tip ── */}
       <div className={styles.tipBox} role="note">
         <Info size={16} style={{ flexShrink: 0, color: 'var(--color-mineral)' }} />
@@ -203,17 +216,17 @@ export default function EvidenceUploader({
           onDragLeave={() => setIsDragOver(false)}
           onDrop={handleDrop}
           onClick={() => fileInputRef.current?.click()}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault()
+              fileInputRef.current?.click()
+            }
+          }}
           role="button"
           tabIndex={0}
           aria-label="Upload structural crack image"
+          data-testid="dropzone-area"
         >
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".jpg,.jpeg,.png,.webp,.tif,.tiff"
-            className={styles.hiddenInput}
-            onChange={handleInputChange}
-          />
           <div className={styles.uploadIconWrap}>
             <UploadCloud size={24} />
           </div>
@@ -226,6 +239,7 @@ export default function EvidenceUploader({
               e.stopPropagation()
               fileInputRef.current?.click()
             }}
+            data-testid="choose-image-btn"
           >
             <FolderOpen size={15} />
             <span>Choose Image</span>
@@ -238,14 +252,7 @@ export default function EvidenceUploader({
 
       {/* ── Active Staged Media Preview Card ── */}
       {mediaFile && (
-        <div className={styles.previewCard}>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".jpg,.jpeg,.png,.webp,.tif,.tiff"
-            className={styles.hiddenInput}
-            onChange={handleInputChange}
-          />
+        <div className={styles.previewCard} data-testid="staged-preview-card">
           <div className={styles.previewLeft}>
             <img
               src={mediaFile.previewUrl}
@@ -288,8 +295,12 @@ export default function EvidenceUploader({
             <button
               type="button"
               className={styles.replaceBtn}
-              onClick={handleReplace}
+              onClick={(e) => {
+                e.stopPropagation()
+                handleReplace()
+              }}
               title="Replace current image with another file"
+              data-testid="replace-image-btn"
             >
               <RefreshCw size={13} />
               <span>Replace</span>
@@ -297,8 +308,12 @@ export default function EvidenceUploader({
             <button
               type="button"
               className={styles.removeBtn}
-              onClick={handleRemove}
+              onClick={(e) => {
+                e.stopPropagation()
+                handleRemove()
+              }}
               title="Remove staged evidence"
+              data-testid="remove-image-btn"
             >
               <Trash2 size={13} />
               <span>Remove</span>
@@ -317,11 +332,14 @@ export default function EvidenceUploader({
 
       {/* ── Optional Archive Gallery Drawer (if asset has archived images) ── */}
       {assetId && archiveCount > 0 && (
-        <div style={{ marginTop: '2px' }}>
+        <div style={{ marginTop: '2px' }} onClick={(e) => e.stopPropagation()}>
           <button
             type="button"
             className={styles.replaceBtn}
-            onClick={() => setShowArchive((prev) => !prev)}
+            onClick={(e) => {
+              e.stopPropagation()
+              setShowArchive((prev) => !prev)
+            }}
             style={{ fontSize: '0.75rem', padding: '4px 10px' }}
           >
             <Camera size={13} />
@@ -351,7 +369,17 @@ export default function EvidenceUploader({
                         className={`${styles.archiveCard} ${
                           isSelected ? styles.archiveCardSelected : ''
                         }`}
-                        onClick={() => handleSelectArchived(ev)}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleSelectArchived(ev)
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            handleSelectArchived(ev)
+                          }
+                        }}
                         role="button"
                         tabIndex={0}
                       >
@@ -389,10 +417,14 @@ export default function EvidenceUploader({
       {/* ── Quick-Select Observation Tags ── */}
       {onToggleTag && (
         <div className={styles.field} style={{ marginTop: '4px' }}>
-          <label className={styles.label}>
+          <span className={styles.label} id="observation-tags-heading">
             Quick Field Observation Tags (Optional)
-          </label>
-          <div className={styles.tagList}>
+          </span>
+          <div
+            className={styles.tagList}
+            role="group"
+            aria-labelledby="observation-tags-heading"
+          >
             {QUICK_OBSERVATION_TAGS.map((tag) => {
               const isSelected = selectedTags.includes(tag)
               return (
@@ -400,8 +432,12 @@ export default function EvidenceUploader({
                   key={tag}
                   type="button"
                   className={`${styles.tagBtn} ${isSelected ? styles.tagBtnSelected : ''}`}
-                  onClick={() => onToggleTag(tag)}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onToggleTag(tag)
+                  }}
                   aria-pressed={isSelected}
+                  data-testid={`tag-${tag.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase()}`}
                 >
                   {isSelected ? `✓ ${tag}` : `+ ${tag}`}
                 </button>
@@ -412,7 +448,7 @@ export default function EvidenceUploader({
       )}
 
       {/* ── Field Notes ── */}
-      <div className={styles.field}>
+      <div className={styles.field} onClick={(e) => e.stopPropagation()}>
         <label htmlFor="inspection-notes-input" className={styles.label}>
           Field Observations / Context Notes (Optional)
         </label>
@@ -423,15 +459,20 @@ export default function EvidenceUploader({
           rows={2}
           value={notes}
           onChange={(e) => onChangeNotes(e.target.value)}
+          onClick={(e) => e.stopPropagation()}
         />
       </div>
 
       {/* ── Collapsible Advanced Options ── */}
       <details className={styles.advancedDetails}>
-        <summary className={styles.advancedSummary}>
+        <summary
+          className={styles.advancedSummary}
+          onClick={(e) => e.stopPropagation()}
+          data-testid="advanced-params-summary"
+        >
           Advanced Ingestion Parameters (Acquisition Modality)
         </summary>
-        <div style={{ marginTop: '12px' }}>
+        <div style={{ marginTop: '12px' }} onClick={(e) => e.stopPropagation()}>
           <label htmlFor="inspection-source-select" className={styles.label}>
             Capture Acquisition Modality
           </label>
