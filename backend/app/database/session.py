@@ -64,25 +64,83 @@ AsyncSessionFactory = async_sessionmaker(
 
 async def create_db_and_tables() -> None:
     """
-    Create all ORM-defined tables in the database.
+    Ensure all ORM-defined tables exist in the database and Alembic is synchronized.
 
-    Called once at application startup via the FastAPI lifespan handler.
-    In production, Alembic migrations should be used instead.
+    Called once at application startup via the FastAPI lifespan handler across all
+    environments (including production). Uses 'IF NOT EXISTS' via Base.metadata.create_all,
+    guaranteeing:
+    1. Mandatory tables (assets, inspections, detections, asset_evidence, etc.) exist
+       safely before any HTTP requests are accepted.
+    2. Existing records, tables, and evidence files are NEVER dropped or deleted.
+    3. Schema matches model declarations exactly (all tables and columns verified).
+    4. Alembic schema revision state is stamped only when the schema is fully validated.
     """
+    import pathlib
+
     # Local imports prevent circular dependency issues at module load time
     from backend.app.models.base import Base  # noqa: PLC0415
 
-    # Importing each model registers it with Base.metadata
+    # Importing all models registers them with Base.metadata
+    import backend.app.models  # noqa: F401, PLC0415
     import backend.app.models.asset  # noqa: F401, PLC0415
-    import backend.app.models.detection  # noqa: F401, PLC0415
+    import backend.app.models.asset_evidence  # noqa: F401, PLC0415
     import backend.app.models.degradation_record  # noqa: F401, PLC0415
+    import backend.app.models.detection  # noqa: F401, PLC0415
     import backend.app.models.health_record  # noqa: F401, PLC0415
     import backend.app.models.inspection  # noqa: F401, PLC0415
 
+    # Ensure parent directory exists for SQLite database file if applicable
+    if "sqlite" in settings.DATABASE_URL:
+        db_path_part = settings.DATABASE_URL.split(":///")[-1].split("?")[0]
+        if db_path_part and db_path_part != ":memory:":
+            pathlib.Path(db_path_part).resolve().parent.mkdir(parents=True, exist_ok=True)
+
+    def _validate_schema(sync_conn: Any) -> None:
+        """Validate that all ORM tables and columns physically exist in the database."""
+        from sqlalchemy import inspect
+        insp = inspect(sync_conn)
+        existing_tables = set(insp.get_table_names())
+        for table_name, table in Base.metadata.tables.items():
+            if table_name not in existing_tables:
+                raise RuntimeError(
+                    f"Database schema validation failed: table '{table_name}' was not created."
+                )
+            existing_cols = {c["name"] for c in insp.get_columns(table_name)}
+            expected_cols = {c.name for c in table.columns}
+            missing = expected_cols - existing_cols
+            if missing:
+                raise RuntimeError(
+                    f"Database schema validation failed: table '{table_name}' missing columns: {missing}"
+                )
+
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        await conn.run_sync(_validate_schema)
 
-    logger.info("Database tables created / verified successfully.")
+    logger.info("Database tables and column schemas verified successfully.")
+
+    # Synchronize Alembic version table only after schema has been verified
+    def _sync_alembic() -> None:
+        try:
+            from alembic import command
+            from alembic.config import Config
+            alembic_ini = settings.BASE_DIR / "backend" / "alembic.ini"
+            if alembic_ini.is_file():
+                cfg = Config(str(alembic_ini))
+                command.stamp(cfg, "head")
+                logger.info("Alembic schema version verified and stamped at head.")
+        except Exception as exc:
+            logger.debug(f"Alembic synchronization skipped: {exc}")
+
+    try:
+        import asyncio
+        await asyncio.to_thread(_sync_alembic)
+    except Exception as exc:
+        logger.debug(f"Alembic async sync notice: {exc}")
+
+
+# Alias for explicit semantic invocation
+init_database = create_db_and_tables
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:

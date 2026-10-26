@@ -42,9 +42,16 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     os.makedirs(settings.UPLOAD_DIR / "evidence", exist_ok=True)
     os.makedirs(settings.WEIGHTS_DIR, exist_ok=True)
 
-    # Development auto-tables. (In production, use Alembic migrations instead)
-    if not settings.is_production:
+    # Initialize and verify database tables across all environments (including production)
+    try:
         await create_db_and_tables()
+    except Exception as db_exc:
+        logger.critical(
+            "FATAL: Database schema initialization failed at startup: %s. Terminating server before accepting requests.",
+            db_exc,
+            exc_info=True,
+        )
+        raise
 
     # Safe startup verification of core vision runtime environment
     try:
