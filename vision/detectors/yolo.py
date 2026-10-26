@@ -162,6 +162,18 @@ class YOLO11Detector(IDetector):
         """True if the model has at least one structural defect class."""
         return len(self.supported_defect_classes) > 0
 
+    @property
+    def task(self) -> str:
+        """Model task type (e.g. 'detect', 'segment')."""
+        if hasattr(self, "_model") and hasattr(self._model, "task"):
+            return str(self._model.task)
+        return "segment"
+
+    @property
+    def supports_segmentation(self) -> bool:
+        """True if the model task is instance segmentation ('segment')."""
+        return self.task == "segment"
+
     def predict(
         self, image: np.ndarray, confidence_threshold: float | None = None
     ) -> list[RawDetection]:

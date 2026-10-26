@@ -76,3 +76,8 @@ class IDetector(ABC):
     def supported_defect_classes(self) -> list[str]:
         """List of supported structural defect class names."""
         return []
+
+    @property
+    def supports_segmentation(self) -> bool:
+        """Whether this detector produces instance segmentation masks."""
+        return True

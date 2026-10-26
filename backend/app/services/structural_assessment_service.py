@@ -155,6 +155,7 @@ class StructuralAssessmentService(BaseService):
         is_defect_model = getattr(detector, "is_defect_model", True) if detector is not None else True
         model_name = getattr(detector, "model_name", "yolo11n-seg.pt") if detector is not None else "unknown"
         supported_classes = getattr(detector, "supported_defect_classes", []) if detector is not None else []
+        supports_segmentation = getattr(detector, "supports_segmentation", True) if detector is not None else True
 
         assessed_date = datetime.datetime.now(datetime.timezone.utc).isoformat()
 
@@ -237,6 +238,41 @@ class StructuralAssessmentService(BaseService):
                     "Metric camera calibration (Ground Sampling Distance / fiducial) not provided.",
                 ],
                 notes="Assessment unverified: No visual defects observed in the analyzed frame, but comprehensive asset health cannot be certified from zero optical detections alone.",
+            )
+
+        # ── 7b. Handle Detection-Only Models (Bounding Boxes Without Masks) ──
+        if not supports_segmentation:
+            logger.info(
+                f"[Integrity Guard] Inspection {inspection_id!r} evaluated with detection-only model '{model_name}'. "
+                "Returning UNVERIFIED assessment: crack width cannot be determined without segmentation masks."
+            )
+            if inspection.health_score is not None:
+                await self._inspection_repo.update_fields(inspection, health_score=None)
+            target_class_desc = ", ".join(supported_classes) if supported_classes else "target defects"
+            return StructuralAssessmentResponse(
+                status="unverified",
+                asset_id=asset.id,
+                asset_name=asset.name,
+                inspection_id=inspection.id,
+                assessment_date_utc=assessed_date,
+                health_score=None,
+                risk_level=None,
+                model_name=model_name,
+                model_validated=True,
+                detected_defect_count=len(detections),
+                data_sources=[
+                    f"Vision Model: {model_name} (Detection-only bounding box model: {target_class_desc})",
+                ],
+                assumptions=STANDARD_ASSUMPTIONS,
+                limitations=[
+                    f"Active model '{model_name}' is an object detection model (bounding boxes only); pixel-level segmentation masks and skeleton centerline metrics are unavailable.",
+                    "Sub-millimeter crack aperture (width) cannot be determined from 2D bounding boxes alone. Under ACI 224R / Eurocode 2 standards, structural health score remains unverified without calibrated width measurements.",
+                    f"This model is trained exclusively for {target_class_desc} localization and does not detect spalling, corrosion, or exposed reinforcement.",
+                ],
+                missing_inputs=[
+                    "Segmentation masks or calibrated optical caliper measurements required for crack width quantification and structural health scoring.",
+                ],
+                notes=f"Detected {len(detections)} crack bounding box(es) via {model_name}. Structural health score unverified pending segmentation-based width measurements.",
             )
 
         # ── 8. Prepare Domain Input ───────────────────────────────────────────
