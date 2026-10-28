@@ -360,7 +360,10 @@ class InspectionService(BaseService):
         inspection = await self._repo.update_fields(
             inspection, status=InspectionStatus.PROCESSING, error_message=None
         )
-        logger.info(f"[Stage 3: Status Updated] Inspection marked as PROCESSING: id={inspection_id!r}")
+        # Release the database write lock before entering CPU-intensive vision inference
+        await self.session.commit()
+        await self.session.refresh(inspection)
+        logger.info(f"[Stage 3: Status Updated & Committed] Inspection marked as PROCESSING: id={inspection_id!r}")
 
         start_time = time.perf_counter()
 
@@ -383,21 +386,25 @@ class InspectionService(BaseService):
             elapsed_ms = (time.perf_counter() - start_time) * 1000
             err_msg = exc.message if hasattr(exc, "message") else str(exc)
             logger.error(f"Inspection processing failed: id={inspection_id!r} error={err_msg}", exc_info=True)
-            return await self._repo.update_fields(
+            failed_insp = await self._repo.update_fields(
                 inspection,
                 status=InspectionStatus.FAILED,
                 error_message=err_msg,
                 processing_time_ms=elapsed_ms,
             )
+            await self.session.commit()
+            return failed_insp
         except Exception as exc:  # noqa: BLE001
             elapsed_ms = (time.perf_counter() - start_time) * 1000
             logger.exception(f"Unexpected error during vision pipeline execution: id={inspection_id!r}")
-            return await self._repo.update_fields(
+            failed_insp = await self._repo.update_fields(
                 inspection,
                 status=InspectionStatus.FAILED,
                 error_message=f"Vision pipeline processing error: {exc}",
                 processing_time_ms=elapsed_ms,
             )
+            await self.session.commit()
+            return failed_insp
 
         elapsed_ms = (time.perf_counter() - start_time) * 1000
 
@@ -475,14 +482,17 @@ class InspectionService(BaseService):
                 f"defects={len(detection_results)} total_time={total_ms:.1f}ms "
                 f"health_score={updated.health_score}"
             )
+            await self.session.commit()
             return updated
         except Exception as post_exc:  # noqa: BLE001
             total_elapsed_ms = (time.perf_counter() - start_time) * 1000
             err_msg = f"Database/assessment error during inspection finalization: {post_exc}"
             logger.error(f"Failed to finalize inspection {inspection_id!r}: {post_exc}", exc_info=True)
-            return await self._repo.update_fields(
+            failed_insp = await self._repo.update_fields(
                 inspection,
                 status=InspectionStatus.FAILED,
                 error_message=err_msg,
                 processing_time_ms=total_elapsed_ms,
             )
+            await self.session.commit()
+            return failed_insp

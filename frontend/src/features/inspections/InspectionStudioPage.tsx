@@ -219,6 +219,7 @@ export default function InspectionStudioPage() {
 
   // Handle Form Submission
   const handleSubmitInspection = async () => {
+    if (isSubmitting) return
     setSubmissionError(null)
 
     if (!mediaFile) {

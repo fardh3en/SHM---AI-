@@ -38,7 +38,7 @@ def _build_engine_kwargs() -> dict[str, Any]:
         # In-memory SQLite requires StaticPool so tables survive across sessions.
         # File-based SQLite uses NullPool so each session has an independent connection,
         # preventing "cannot commit transaction - SQL statements in progress" on concurrent requests.
-        kwargs["connect_args"] = {"check_same_thread": False, "timeout": 30.0}
+        kwargs["connect_args"] = {"check_same_thread": False, "timeout": 60.0}
         if ":memory:" in url:
             kwargs["poolclass"] = StaticPool
         else:
@@ -65,7 +65,8 @@ if "sqlite" in settings.DATABASE_URL:
         try:
             cursor = dbapi_connection.cursor()
             cursor.execute("PRAGMA journal_mode=WAL")
-            cursor.execute("PRAGMA busy_timeout=30000")
+            cursor.execute("PRAGMA busy_timeout=60000")
+            cursor.execute("PRAGMA synchronous=NORMAL")
             cursor.close()
         except Exception:
             pass
