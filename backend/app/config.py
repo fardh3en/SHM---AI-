@@ -37,7 +37,7 @@ class Settings(BaseSettings):
 
     # ── Application ────────────────────────────────────────────────────────────
     APP_NAME: str = "SHM-AI Platform"
-    APP_VERSION: str = "0.6.0"
+    APP_VERSION: str = "0.6.1"
     APP_ENV: str = Field(
         default="development",
         pattern=r"^(development|staging|production)$",
@@ -106,6 +106,9 @@ class Settings(BaseSettings):
         "crack_yolo26n": "shm_ai_yolo26n_seg_15e_best.pt",
         "crack_seg_26n": "shm_ai_yolo26n_seg_15e_best.pt",
         "shm_ai_yolo26n_seg_15e_best.pt": "shm_ai_yolo26n_seg_15e_best.pt",
+        # Legacy preview / generic checkpoint aliases -> resolve to production YOLO26 segmentation model
+        "best": "shm_ai_yolo26n_seg_15e_best.pt",
+        "best.pt": "shm_ai_yolo26n_seg_15e_best.pt",
         "yolo11n-crack-seg": "shm_ai_crack_seg_finetune_15e_best.pt",
         "yolo11n-crack-seg.pt": "shm_ai_crack_seg_finetune_15e_best.pt",
         "crack_seg_15e": "shm_ai_crack_seg_finetune_15e_best.pt",
@@ -123,7 +126,7 @@ class Settings(BaseSettings):
         ),
     )
     DEFAULT_MODEL_NAME: str = Field(
-        default="yolo11n-seg.pt",
+        default="yolo26n-crack-seg",
         description=(
             "YOLO model filename or alias inside WEIGHTS_DIR. "
             "Supported aliases: 'yolo26n-crack-seg', 'yolo11n-crack-seg', 'crack_yolov8n_concrete', 'yolo11n-seg'. "

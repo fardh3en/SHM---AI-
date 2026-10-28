@@ -15,7 +15,7 @@
 [![Tests](https://img.shields.io/badge/Tests-669+%20Passing-success.svg)](https://pytest.org/)
 [![Workflow](https://img.shields.io/badge/Workflow-9%2F9%20Verified-success.svg)](scripts/verify_workflow.py)
 [![Status](https://img.shields.io/badge/Status-Active%20Engineering%20Platform-success.svg)](#implementation-progress)
-[![Version](https://img.shields.io/badge/Version-v0.6.0-blue.svg)](https://github.com/fardh3en/SHM---AI-)
+[![Version](https://img.shields.io/badge/Version-v0.6.1-blue.svg)](https://github.com/fardh3en/SHM---AI-)
 
 </div>
 

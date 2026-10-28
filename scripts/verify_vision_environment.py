@@ -136,7 +136,16 @@ def verify_vision_environment(verbose: bool = True) -> dict[str, Any]:
             if "ultralytics" in report["versions"]:
                 try:
                     model = YOLO(str(weights_path))
-                    report["model_task"] = getattr(model, "task", "segment")
+                    task = getattr(model, "task", "segment")
+                    report["model_task"] = task
+                    if task != "segment":
+                        report["healthy"] = False
+                        report["errors"].append(
+                            f"Model weights '{weights_path.name}' have task '{task}', but SHM-AI v0.6.1+ "
+                            "requires an instance segmentation model ('segment') for crack polygon extraction, "
+                            "morphological skeletonization, and calibrated width metrics. "
+                            f"Detection-only models (like '{weights_path.name}') are incompatible with production inspection."
+                        )
                 except Exception as load_err:
                     report["healthy"] = False
                     report["errors"].append(f"YOLO model load failure on weights '{weights_path}': {load_err}")

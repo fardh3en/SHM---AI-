@@ -210,3 +210,59 @@ def test_system_info_endpoint_includes_vision_runtime() -> None:
     assert "torch" in vr["versions"]
     assert "ultralytics" in vr["versions"]
 
+
+def test_verify_vision_environment_rejects_detection_model(tmp_path: Path) -> None:
+    """Regression test: verify_vision_environment must reject detection-only models (task != 'segment')."""
+    from unittest.mock import MagicMock
+    from scripts.verify_vision_environment import verify_vision_environment
+
+    fake_weights = tmp_path / "weights" / "shm_ai_yolo26n_seg_15e_best.pt"
+    fake_weights.parent.mkdir(parents=True, exist_ok=True)
+    fake_weights.write_bytes(b"\x00" * 1_500_000)
+
+    mock_model = MagicMock()
+    mock_model.task = "detect"
+
+    with patch("backend.app.config.get_settings") as mock_settings:
+        mock_settings.return_value.default_model_path = fake_weights
+        with patch("ultralytics.YOLO", return_value=mock_model):
+            report = verify_vision_environment(verbose=False)
+            assert report["healthy"] is False
+            assert report["model_task"] == "detect"
+            assert any("requires an instance segmentation model ('segment')" in e for e in report["errors"])
+
+
+def test_alias_resolution_for_legacy_best_pt() -> None:
+    """Regression test: verify that legacy 'best.pt' and default aliases resolve to YOLO26 segmentation checkpoint."""
+    from backend.app.config import Settings
+
+    # Default model setting is now yolo26n-crack-seg
+    s_default = Settings()
+    assert s_default.DEFAULT_MODEL_NAME == "yolo26n-crack-seg"
+    assert s_default.default_model_path.name == "shm_ai_yolo26n_seg_15e_best.pt"
+
+    # Legacy Render dashboard override: DEFAULT_MODEL_NAME=best.pt
+    s_best_pt = Settings(DEFAULT_MODEL_NAME="best.pt")
+    assert s_best_pt.default_model_path.name == "shm_ai_yolo26n_seg_15e_best.pt"
+
+    # Legacy Render dashboard override: DEFAULT_MODEL_NAME=best
+    s_best = Settings(DEFAULT_MODEL_NAME="best")
+    assert s_best.default_model_path.name == "shm_ai_yolo26n_seg_15e_best.pt"
+
+    # Explicit segmentation alias
+    s_seg = Settings(DEFAULT_MODEL_NAME="yolo26n-crack-seg")
+    assert s_seg.default_model_path.name == "shm_ai_yolo26n_seg_15e_best.pt"
+
+
+def test_verify_vision_environment_missing_weights_and_invalid_alias(tmp_path: Path) -> None:
+    """Verify that an unmapped invalid alias or missing model file fails verification cleanly."""
+    from scripts.verify_vision_environment import verify_vision_environment
+
+    missing_weights = tmp_path / "weights" / "invalid_nonexistent_model.pt"
+
+    with patch("backend.app.config.get_settings") as mock_settings:
+        mock_settings.return_value.default_model_path = missing_weights
+        report = verify_vision_environment(verbose=False)
+        assert report["healthy"] is False
+        assert any("file not found" in e.lower() for e in report["errors"])
+

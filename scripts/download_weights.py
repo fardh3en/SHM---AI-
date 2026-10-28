@@ -106,7 +106,7 @@ def _resolve_download_source(target_name: str, target_filename: str | None = Non
     if custom_url:
         return custom_url.strip(), {}
 
-    if target_name == HF_CRACK_MODEL_NAME or resolved_file == HF_CRACK_MODEL_NAME:
+    if resolved_file == HF_CRACK_MODEL_NAME and resolved_file != "shm_ai_yolo26n_seg_15e_best.pt":
         token = (
             os.environ.get("HF_TOKEN")
             or os.environ.get("HUGGINGFACE_TOKEN")
