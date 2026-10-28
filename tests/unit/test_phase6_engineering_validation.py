@@ -348,7 +348,7 @@ def test_retired_degradation_absent_from_user_reports():
     assert "Structural Health Score &amp; Risk Classification" in html
     assert "82.0" in html
     assert "Inferred Structural Failure Mechanisms" in html
-    assert "Photographic Inspection Evidence &amp; Detections" in html
+    assert "Photographic Inspection Evidence" in html
     assert "Tower Bridge Pier" in html
     assert "Professional Structural Engineer Sign-Off" in html
 

@@ -41,7 +41,7 @@ class PaginatedResponse(SHMBaseSchema, Generic[T]):
     items: list[T]
     total: int = Field(description="Total number of records matching the query.")
     page: int = Field(ge=1, description="Current page number (1-indexed).")
-    page_size: int = Field(ge=1, le=100, description="Number of items per page.")
+    page_size: int = Field(ge=1, le=500, description="Number of items per page.")
     pages: int = Field(description="Total number of pages.")
 
     @classmethod

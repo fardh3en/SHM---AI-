@@ -40,4 +40,5 @@ class ReportGenerateResponse(SHMBaseSchema):
     currency: str
     html_content: str
     pdf_available: bool = False
+    pdf_filename: str | None = None
     notes: str | None = None

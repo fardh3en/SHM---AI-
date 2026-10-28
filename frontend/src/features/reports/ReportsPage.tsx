@@ -3,7 +3,8 @@ import { useSearchParams } from 'react-router-dom'
 import { useAssets } from '../../hooks/useAssets'
 import { useAssetInspections } from '../../hooks/useAssetInspections'
 import { useReportsList, useGenerateReport } from '../../hooks/useReports'
-import type { ReportGenerateResponse } from '../../api/reports'
+import { reportsApi, type ReportGenerateResponse } from '../../api/reports'
+import { isTestFixture } from '../assets/AssetListPage'
 import PageHeader from '../../components/layout/PageHeader'
 import LoadingState from '../../components/ui/LoadingState'
 import ErrorState from '../../components/ui/ErrorState'
@@ -17,6 +18,7 @@ import {
   Archive,
   AlertCircle,
   CheckCircle2,
+  FileQuestion,
 } from 'lucide-react'
 import styles from './ReportsPage.module.css'
 
@@ -26,8 +28,12 @@ export default function ReportsPage() {
   const urlInspId = searchParams.get('inspectionId')
   const urlReportFile = searchParams.get('reportFile')
 
-  const { data: assetsData, isLoading: assetsLoading, isError: assetsError } = useAssets(1, 100)
+  const { data: assetsData, isLoading: assetsLoading, isError: assetsError } = useAssets(1, 250)
   const assets = useMemo(() => assetsData?.items ?? [], [assetsData])
+
+  // Partition assets: civil infrastructure vs automated test fixtures
+  const civilAssets = useMemo(() => assets.filter((a) => !isTestFixture(a)), [assets])
+  const fixtureAssets = useMemo(() => assets.filter((a) => isTestFixture(a)), [assets])
 
   // Asset selection
   const [selectedAssetId, setSelectedAssetId] = useState<string>('')
@@ -38,11 +44,12 @@ export default function ReportsPage() {
     }
   }, [urlAssetId, assets])
 
-  const effectiveAssetId = selectedAssetId || (urlAssetId && assets.some((a) => a.id === urlAssetId) ? urlAssetId : assets[0]?.id) || ''
+  const defaultAssetId = civilAssets[0]?.id || assets[0]?.id || ''
+  const effectiveAssetId = selectedAssetId || (urlAssetId && assets.some((a) => a.id === urlAssetId) ? urlAssetId : defaultAssetId)
 
   const selectedAsset = useMemo(
-    () => assets.find((a) => a.id === effectiveAssetId) ?? assets[0] ?? null,
-    [assets, effectiveAssetId]
+    () => assets.find((a) => a.id === effectiveAssetId) ?? civilAssets[0] ?? assets[0] ?? null,
+    [assets, civilAssets, effectiveAssetId]
   )
 
   // Inspections for selected asset
@@ -61,7 +68,11 @@ export default function ReportsPage() {
     }
   }, [urlInspId, completedInspections])
 
-  const effectiveInspId = selectedInspId || (urlInspId && completedInspections.some((i) => i.id === urlInspId) ? urlInspId : completedInspections[0]?.id) || ''
+  // If selectedInspId is not in the current asset's completed inspections, default to first completed inspection
+  const isSelectedInspValid = Boolean(selectedInspId && completedInspections.some((i) => i.id === selectedInspId))
+  const effectiveInspId = isSelectedInspValid
+    ? selectedInspId
+    : (urlInspId && completedInspections.some((i) => i.id === urlInspId) ? urlInspId : completedInspections[0]?.id) || ''
 
   const selectedInspection = useMemo(
     () => completedInspections.find((i) => i.id === effectiveInspId) ?? completedInspections[0] ?? null,
@@ -75,6 +86,8 @@ export default function ReportsPage() {
   const generateMutation = useGenerateReport()
   const [activeReport, setActiveReport] = useState<ReportGenerateResponse | null>(null)
   const [selectedReportFile, setSelectedReportFile] = useState<string | null>(null)
+  const [iframeLoading, setIframeLoading] = useState<boolean>(false)
+  const [iframeError, setIframeError] = useState<boolean>(false)
   const iframeRef = useRef<HTMLIFrameElement>(null)
 
   useEffect(() => {
@@ -82,6 +95,15 @@ export default function ReportsPage() {
       setSelectedReportFile(urlReportFile)
     }
   }, [urlReportFile])
+
+  const currentPreviewFilename = activeReport?.filename || selectedReportFile
+
+  useEffect(() => {
+    if (currentPreviewFilename) {
+      setIframeLoading(true)
+      setIframeError(false)
+    }
+  }, [currentPreviewFilename, activeReport])
 
   const handleCompileReport = () => {
     if (!selectedAsset || !selectedInspection) return
@@ -106,8 +128,6 @@ export default function ReportsPage() {
       iframeRef.current.contentWindow.print()
     }
   }
-
-  const currentPreviewFilename = activeReport?.filename || selectedReportFile
 
   if (assetsLoading) {
     return (
@@ -170,11 +190,24 @@ export default function ReportsPage() {
                   setSelectedInspId('')
                 }}
               >
-                {assets.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.name} ({a.asset_type.toUpperCase()})
-                  </option>
-                ))}
+                {civilAssets.length > 0 && (
+                  <optgroup label="Civil Infrastructure">
+                    {civilAssets.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.name} ({a.asset_type.toUpperCase()})
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+                {fixtureAssets.length > 0 && (
+                  <optgroup label="Automated Test Fixtures">
+                    {fixtureAssets.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        [Test Fixture] {a.name} ({a.asset_type.toUpperCase()})
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
               </select>
             </div>
 
@@ -244,8 +277,8 @@ export default function ReportsPage() {
           )}
         </section>
 
-        {/* Live Report Preview Frame */}
-        {currentPreviewFilename && (
+        {/* Live Report Preview Frame or Empty Preview State */}
+        {currentPreviewFilename ? (
           <section className={styles.previewSection} aria-label="Report Preview">
             <div className={styles.previewHeader}>
               <div className={styles.previewMeta}>
@@ -262,6 +295,16 @@ export default function ReportsPage() {
               </div>
 
               <div className={styles.previewActions}>
+                <a
+                  href={reportsApi.getPdfUrl(currentPreviewFilename)}
+                  download={currentPreviewFilename.replace(/\.html$/i, '') + '.pdf'}
+                  className={styles.previewBtnPrimary}
+                  title="Download formal engineering report as PDF document"
+                >
+                  <Download size={13} />
+                  <span>Download PDF</span>
+                </a>
+
                 <a
                   href={`/api/v1/reports/${currentPreviewFilename}`}
                   target="_blank"
@@ -296,13 +339,46 @@ export default function ReportsPage() {
             </div>
 
             <div className={styles.iframeWrapper}>
-              <iframe
-                ref={iframeRef}
-                src={activeReport ? undefined : `/api/v1/reports/${currentPreviewFilename}`}
-                srcDoc={activeReport ? activeReport.html_content : undefined}
-                title="Compiled Engineering Report Preview"
-                className={styles.reportIframe}
-              />
+              {iframeLoading && !iframeError && (
+                <div className={styles.iframeLoading}>
+                  <RotateCw size={24} className="spin" color="var(--color-mineral)" />
+                  <span>Rendering engineering dossier preview...</span>
+                </div>
+              )}
+              {iframeError ? (
+                <div className={styles.iframeError}>
+                  <AlertCircle size={28} />
+                  <div>Failed to load preview for <strong>{currentPreviewFilename}</strong>.</div>
+                  <div style={{ fontSize: '0.75rem', opacity: 0.8 }}>
+                    You can still download the file or open it in a new browser tab using the buttons above.
+                  </div>
+                </div>
+              ) : (
+                <iframe
+                  ref={iframeRef}
+                  src={activeReport ? undefined : `/api/v1/reports/${currentPreviewFilename}`}
+                  srcDoc={activeReport ? activeReport.html_content : undefined}
+                  title="Compiled Engineering Report Preview"
+                  className={styles.reportIframe}
+                  onLoad={() => setIframeLoading(false)}
+                  onError={() => {
+                    setIframeLoading(false)
+                    setIframeError(true)
+                  }}
+                />
+              )}
+            </div>
+          </section>
+        ) : (
+          <section className={styles.emptyPreviewSection} aria-label="No Report Selected">
+            <div className={styles.emptyPreviewCard}>
+              <FileQuestion size={36} className={styles.emptyPreviewIcon} />
+              <h3 className={styles.emptyPreviewTitle}>No Report Selected for Preview</h3>
+              <p className={styles.emptyPreviewDesc}>
+                Select a civil structure and completed inspection above, then click{' '}
+                <strong>Compile &amp; Preview Report</strong> to generate a formal structural condition dossier.
+                Or click <strong>Preview</strong> on any archived report below to inspect the complete engineering dossier.
+              </p>
             </div>
           </section>
         )}
@@ -391,13 +467,23 @@ export default function ReportsPage() {
                               <span>Preview</span>
                             </button>
                             <a
+                              href={reportsApi.getPdfUrl(r.filename)}
+                              download={r.filename.replace(/\.html$/i, '') + '.pdf'}
+                              className={styles.reportLink}
+                              style={{ color: 'var(--brand-primary)', fontWeight: 600 }}
+                              title="Download PDF Dossier"
+                            >
+                              <Download size={13} />
+                              <span>PDF</span>
+                            </a>
+                            <a
                               href={`/api/v1/reports/${r.filename}`}
                               download={r.filename}
                               className={styles.reportLink}
-                              title="Download file"
+                              title="Download HTML file"
                             >
                               <Download size={13} />
-                              <span>Download</span>
+                              <span>HTML</span>
                             </a>
                           </div>
                         </td>

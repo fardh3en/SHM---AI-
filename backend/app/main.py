@@ -74,6 +74,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     except Exception as v_err:
         logger.warning("Vision environment check encountered unexpected error: %s", v_err)
 
+    logger.info("SHM-AI Platform backend service startup complete. Server ready.")
+
     yield
 
     logger.info("Shutting down SHM-AI Platform backend service...")

@@ -11,3 +11,20 @@ services:
         value: production
       - key: INFERENCE_DEVICE
         value: cpu
+      - key: DEFAULT_MODEL_NAME
+        value: yolo26n-crack-seg
+      # Optional: set MODEL_WEIGHTS_URL if hosting custom weights externally
+      # - key: MODEL_WEIGHTS_URL
+      #   value: "https://github.com/fardh3en/SHM---AI-/releases/download/v0.6.0/shm_ai_yolo26n_seg_15e_best.pt"
+    # To enable persistent storage on Render (Starter plan or above):
+    # disk:
+    #   name: shm-ai-data
+    #   mountPath: /var/data
+    #   sizeGB: 1
+    # envVars for persistent disk:
+    #   - key: DATABASE_URL
+    #     value: sqlite+aiosqlite:////var/data/shm_ai.db
+    #   - key: UPLOAD_DIR
+    #     value: /var/data/uploads
+    #   - key: REPORTS_DIR
+    #     value: /var/data/reports

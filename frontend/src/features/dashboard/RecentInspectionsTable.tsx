@@ -1,6 +1,9 @@
+import { useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
+import { Filter } from 'lucide-react'
 import { useInspections } from '../../hooks/useInspections'
 import { useAssets } from '../../hooks/useAssets'
+import { isTestFixture } from '../assets/AssetListPage'
 import StatusChip from '../../components/ui/StatusChip'
 import LoadingState from '../../components/ui/LoadingState'
 import ErrorState from '../../components/ui/ErrorState'
@@ -31,19 +34,49 @@ function healthScoreClass(score: number | null): string {
 interface AssetMap { [id: string]: Asset }
 
 export default function RecentInspectionsTable() {
+  const [hideTestRecords, setHideTestRecords] = useState(true)
+
   const {
     data: inspData,
     isLoading,
     isError,
     refetch,
-  } = useInspections(1, 10)
+  } = useInspections(1, 100)
 
-  const { data: assetsData } = useAssets(1, 100)
+  const { data: assetsData } = useAssets(1, 250)
 
-  const assetMap: AssetMap = {}
-  assetsData?.items.forEach((a) => { assetMap[a.id] = a })
+  const assetMap: AssetMap = useMemo(() => {
+    const map: AssetMap = {}
+    assetsData?.items.forEach((a) => { map[a.id] = a })
+    return map
+  }, [assetsData?.items])
 
-  const inspections: Inspection[] = inspData?.items ?? []
+  const allInspections: Inspection[] = useMemo(() => inspData?.items ?? [], [inspData?.items])
+
+  const testFixtureCount = useMemo(() => {
+    return allInspections.filter((insp) => {
+      const asset = assetMap[insp.asset_id]
+      return (
+        (asset && isTestFixture(asset)) ||
+        (insp.input_path && insp.input_path.includes('test.jpg')) ||
+        (insp.notes && /test fixture|automated test/i.test(insp.notes))
+      )
+    }).length
+  }, [allInspections, assetMap])
+
+  const displayedInspections = useMemo(() => {
+    const list = hideTestRecords
+      ? allInspections.filter((insp) => {
+          const asset = assetMap[insp.asset_id]
+          const isFixture =
+            (asset && isTestFixture(asset)) ||
+            (insp.input_path && insp.input_path.includes('test.jpg')) ||
+            (insp.notes && /test fixture|automated test/i.test(insp.notes))
+          return !isFixture
+        })
+      : allInspections
+    return list.slice(0, 10)
+  }, [allInspections, assetMap, hideTestRecords])
 
   return (
     <div className={styles.container}>
@@ -54,14 +87,40 @@ export default function RecentInspectionsTable() {
           onRetry={refetch}
         />
       )}
-      {!isLoading && !isError && inspections.length === 0 && (
+      {!isLoading && !isError && allInspections.length === 0 && (
         <EmptyState
           title="No inspections yet"
           description="Create an asset and run an inspection to see results here."
         />
       )}
-      {!isLoading && !isError && inspections.length > 0 && (
+      {!isLoading && !isError && allInspections.length > 0 && (
         <div className={styles.tableWrapper} role="region" aria-label="Recent inspections">
+          <div className={styles.tableToolbar}>
+            <button
+              type="button"
+              onClick={() => setHideTestRecords((prev) => !prev)}
+              className={[
+                styles.fixtureToggleBtn,
+                hideTestRecords ? styles.fixtureToggleBtnActive : '',
+              ].join(' ')}
+              title={
+                hideTestRecords
+                  ? 'Showing civil infrastructure inspections only. Click to display test records.'
+                  : 'Showing all inspections including automated test fixtures.'
+              }
+            >
+              <Filter size={12} />
+              <span>{hideTestRecords ? 'Civil Inspections' : 'All Inspections'}</span>
+            </button>
+            {testFixtureCount > 0 && (
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                {hideTestRecords
+                  ? `(${testFixtureCount} test records hidden)`
+                  : `(${testFixtureCount} test fixtures included)`}
+              </span>
+            )}
+          </div>
+
           <table className={styles.table}>
             <thead>
               <tr>
@@ -74,17 +133,29 @@ export default function RecentInspectionsTable() {
               </tr>
             </thead>
             <tbody>
-              {inspections.map((insp) => {
+              {displayedInspections.map((insp) => {
                 const asset = assetMap[insp.asset_id]
+                const isFixture =
+                  (asset && isTestFixture(asset)) ||
+                  (insp.input_path && insp.input_path.includes('test.jpg'))
                 return (
                   <tr key={insp.id}>
                     <td className={styles.assetCell}>
                       {asset ? (
-                        <Link to={`/assets/${asset.id}`} className={styles.assetLink}>
-                          <span className={styles.assetName}>{asset.name}</span>
-                        </Link>
+                        <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap' }}>
+                          <Link to={`/assets/${asset.id}`} className={styles.assetLink}>
+                            <span className={styles.assetName}>{asset.name}</span>
+                          </Link>
+                          {isFixture && (
+                            <span className={styles.testBadge} title="Automated testing fixture">
+                              Test Fixture
+                            </span>
+                          )}
+                        </div>
                       ) : (
-                        <span className={styles.assetName}>—</span>
+                        <span className={styles.assetName}>
+                          Unlinked Asset ({insp.asset_id.slice(0, 8)})
+                        </span>
                       )}
                       {asset?.location && (
                         <span className={styles.assetLocation}>{asset.location}</span>
@@ -96,7 +167,13 @@ export default function RecentInspectionsTable() {
                       </span>
                     </td>
                     <td>
-                      <StatusChip status={insp.status} size="sm" />
+                      <Link
+                        to={`/vision?inspectionId=${insp.id}`}
+                        style={{ textDecoration: 'none', display: 'inline-block' }}
+                        title="Open inspection in Vision Analysis"
+                      >
+                        <StatusChip status={insp.status} size="sm" />
+                      </Link>
                     </td>
                     <td className={styles.numCol}>
                       {insp.defect_count > 0 ? (
@@ -116,10 +193,11 @@ export default function RecentInspectionsTable() {
               })}
             </tbody>
           </table>
-          {inspData && inspData.total > 10 && (
+          {displayedInspections.length > 0 && (
             <div className={styles.footer}>
               <span className={styles.footerNote}>
-                Showing 10 of {inspData.total} inspections
+                Showing {displayedInspections.length} {hideTestRecords ? 'civil' : 'total'} inspections
+                {hideTestRecords && testFixtureCount > 0 ? ` (${testFixtureCount} test records excluded)` : ''}
               </span>
             </div>
           )}

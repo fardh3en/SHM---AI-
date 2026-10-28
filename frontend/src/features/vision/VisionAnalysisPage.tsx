@@ -29,6 +29,7 @@ import {
   HelpCircle,
   FileText,
   ExternalLink,
+  Download,
 } from 'lucide-react'
 import styles from './VisionAnalysisPage.module.css'
 
@@ -78,13 +79,13 @@ export default function VisionAnalysisPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const queryClient = useQueryClient()
 
-  const { data: inspData, isLoading: inspLoading, isError: inspError, refetch } = useInspections(1, 100)
-  const { data: assetsData } = useAssets(1, 100)
+  const { data: inspData, isLoading: inspLoading, isError: inspError, refetch } = useInspections(1, 250)
+  const { data: assetsData } = useAssets(1, 250)
 
   const inspections = useMemo(() => inspData?.items ?? [], [inspData])
   const assets = useMemo(() => assetsData?.items ?? [], [assetsData])
 
-  // Select inspection from URL param or default to the first one
+  // Select inspection from URL param, localStorage, or preferred verified completed inspection
   const urlInspId = searchParams.get('inspectionId')
   const [selectedInspId, setSelectedInspId] = useState<string>('')
 
@@ -93,7 +94,21 @@ export default function VisionAnalysisPage() {
       if (urlInspId && inspections.some((i) => i.id === urlInspId)) {
         setSelectedInspId(urlInspId)
       } else if (!selectedInspId) {
-        setSelectedInspId(inspections[0].id)
+        let storedId: string | null = null
+        try {
+          storedId = localStorage.getItem('shm_active_inspection_id')
+        } catch {
+          // ignore
+        }
+        if (storedId && inspections.some((i) => i.id === storedId)) {
+          setSelectedInspId(storedId)
+        } else {
+          // Prefer completed inspection with verified photographic evidence
+          const preferred = inspections.find(
+            (i) => i.status === 'completed' && i.input_path && !i.input_path.includes('test.jpg')
+          )
+          setSelectedInspId(preferred ? preferred.id : inspections[0].id)
+        }
       }
     }
   }, [inspections, urlInspId, selectedInspId])
@@ -102,6 +117,16 @@ export default function VisionAnalysisPage() {
     () => inspections.find((i) => i.id === selectedInspId) ?? inspections[0] ?? null,
     [inspections, selectedInspId]
   )
+
+  useEffect(() => {
+    if (selectedInspection?.id) {
+      try {
+        localStorage.setItem('shm_active_inspection_id', selectedInspection.id)
+      } catch {
+        // ignore localStorage access issues in restrictive sandboxes
+      }
+    }
+  }, [selectedInspection?.id])
 
   const associatedAsset = useMemo(() => {
     if (!selectedInspection) return null
@@ -324,9 +349,11 @@ export default function VisionAnalysisPage() {
                     month: 'short',
                     year: 'numeric',
                   })
+                  const isTestPath = i.input_path && i.input_path.includes('test.jpg')
+                  const labelSuffix = isTestPath ? ' [Test Artifact]' : ''
                   return (
                     <option key={i.id} value={i.id}>
-                      {assetName} • {dateStr} ({i.defect_count} defects, {i.status.toUpperCase()})
+                      {assetName} • {dateStr} ({i.defect_count} defects, {i.status.toUpperCase()}){labelSuffix}
                     </option>
                   )
                 })}
@@ -378,7 +405,14 @@ export default function VisionAnalysisPage() {
 
             {/* 2. Analyze Another Image Action */}
             <Link
-              to="/inspections"
+              to="/inspections?new=true"
+              onClick={() => {
+                try {
+                  localStorage.removeItem('shm_active_inspection_id')
+                } catch {
+                  // ignore
+                }
+              }}
               className={styles.runButton}
               style={{
                 background: 'var(--color-mineral)',
@@ -461,6 +495,15 @@ export default function VisionAnalysisPage() {
                 <span>• Action: {reportSuccessNotice.recommendedAction.toUpperCase()}</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <a
+                  href={`/api/v1/reports/${reportSuccessNotice.filename.replace(/\.html$/i, '')}/pdf`}
+                  download={reportSuccessNotice.filename.replace(/\.html$/i, '') + '.pdf'}
+                  className={styles.inlineActionLink}
+                  style={{ background: 'var(--brand-primary)', color: '#111413', fontWeight: 600 }}
+                  title="Download PDF Dossier"
+                >
+                  <Download size={12} /> Download PDF
+                </a>
                 <Link
                   to={`/reports?assetId=${selectedInspection.asset_id}&inspectionId=${selectedInspection.id}&reportFile=${reportSuccessNotice.filename}`}
                   className={styles.inlineActionLink}
@@ -655,8 +698,32 @@ export default function VisionAnalysisPage() {
                   <div style={{ color: 'var(--color-clay, #d97736)', padding: '2.5rem 1.5rem', textAlign: 'center' }}>
                     <AlertTriangle size={32} style={{ margin: '0 auto 8px auto', display: 'block' }} />
                     <div style={{ fontWeight: 600, marginBottom: '6px' }}>Evidence Image Missing on Server</div>
-                    <div style={{ fontSize: '0.8125rem', opacity: 0.85, wordBreak: 'break-all' }}>
-                      File path <code>{selectedInspection.input_path}</code> was not found on the server disk.
+                    <div style={{ fontSize: '0.8125rem', opacity: 0.85, wordBreak: 'break-all', marginBottom: '14px' }}>
+                      File path <code>{selectedInspection.input_path}</code> was not found on the server filesystem.
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', flexWrap: 'wrap' }}>
+                      {inspections.some((i) => i.status === 'completed' && i.input_path && !i.input_path.includes('test.jpg')) && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const verified = inspections.find(
+                              (i) => i.status === 'completed' && i.input_path && !i.input_path.includes('test.jpg')
+                            )
+                            if (verified) handleInspectionChange(verified.id)
+                          }}
+                          className={styles.presetBtn}
+                          style={{ fontSize: '0.75rem', padding: '6px 12px' }}
+                        >
+                          Switch to Inspection with Evidence
+                        </button>
+                      )}
+                      <Link
+                        to={`/inspections?inspectionId=${selectedInspection.id}`}
+                        className={styles.presetBtn}
+                        style={{ fontSize: '0.75rem', padding: '6px 12px', textDecoration: 'none' }}
+                      >
+                        Attach Photo in Studio
+                      </Link>
                     </div>
                   </div>
                 ) : (

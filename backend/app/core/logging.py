@@ -27,8 +27,12 @@ def configure_logging() -> None:
     )
 
     # ── Suppress noisy third-party loggers ────────────────────────────────────
-    logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
-    logging.getLogger("uvicorn.error").setLevel(logging.WARNING)
+    # Keep uvicorn.error at INFO so startup banner, listening port, and lifecycle
+    # messages are visible to developers.
+    logging.getLogger("uvicorn.error").setLevel(logging.INFO)
+    logging.getLogger("uvicorn.access").setLevel(
+        logging.INFO if settings.DEBUG else logging.WARNING
+    )
     logging.getLogger("sqlalchemy.engine").setLevel(
         logging.INFO if settings.DATABASE_ECHO else logging.WARNING
     )

@@ -40,11 +40,13 @@ data/
 *.db
 *.sqlite3
 
-# ── Model weights (large binary files — store in DVC or cloud) ─────────────────
+# ── Model weights ─────────────────────────────────────────────────────────────
 weights/*.pt
 weights/*.pth
 weights/*.onnx
 !weights/.gitkeep
+# Track production fine-tuned YOLO26 segmentation checkpoint (6.29 MB, within GitHub 100MB limit)
+!weights/shm_ai_yolo26n_seg_15e_best.pt
 runs/
 
 # ── Datasets (raw images, annotations, zip archives) ──────────────────────────

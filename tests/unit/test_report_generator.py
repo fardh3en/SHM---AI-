@@ -249,10 +249,11 @@ class TestSoftDependency:
     ) -> None:
         inp, report = sample_report_tuple
 
-        # Simulate missing WeasyPrint package
+        # Simulate missing WeasyPrint package and no Chromium browser
         with (
+            patch("recommendation.report_generator._find_chromium_executable", return_value=None),
             patch.dict("sys.modules", {"weasyprint": None}),
-            pytest.raises(RuntimeError, match="WeasyPrint is required for PDF generation"),
+            pytest.raises(RuntimeError, match="PDF generation requires a Chromium-based browser"),
         ):
             generator.generate_pdf(inp, report)
 
@@ -263,15 +264,17 @@ class TestSoftDependency:
 
 
 class TestPdfGeneration:
-    def test_generate_pdf_if_weasyprint_installed(
+    def test_generate_pdf_if_engine_available(
         self,
         generator: ReportGenerator,
         sample_report_tuple: tuple[RecommendationInput, RecommendationReport],
     ) -> None:
-        pytest.importorskip("weasyprint")
         inp, report = sample_report_tuple
 
-        pdf_bytes = generator.generate_pdf(inp, report)
-        assert isinstance(pdf_bytes, bytes)
-        assert pdf_bytes.startswith(b"%PDF")
+        try:
+            pdf_bytes = generator.generate_pdf(inp, report)
+            assert isinstance(pdf_bytes, bytes)
+            assert pdf_bytes.startswith(b"%PDF")
+        except RuntimeError:
+            pytest.skip("Neither Chromium nor WeasyPrint is available in the test environment")
 

@@ -15,16 +15,67 @@ Verifies:
 import io
 from unittest.mock import patch
 
+import pytest
 from PIL import Image
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from starlette.testclient import TestClient
 
 from backend.app.config import get_settings
+from backend.app.database.session import get_db
 from backend.app.main import app
+from backend.app.models.base import Base
 from backend.app.models.detection import DefectType
 from vision.detectors.base import IDetector, RawDetection
 from vision.pipeline.cv_pipeline import CVInferencePipeline
 
 client = TestClient(app, raise_server_exceptions=False)
+
+
+@pytest.fixture(scope="module", autouse=True)
+def isolate_evidence_test_db(tmp_path_factory):
+    """
+    Ensure evidence upload tests run in an isolated test database,
+    preventing test fixture pollution in the live application database (data/shm_ai.db).
+    """
+    import asyncio
+    temp_dir = tmp_path_factory.mktemp("evidence_test_db")
+    db_file = temp_dir / "isolated_test.db"
+    engine = create_async_engine(
+        f"sqlite+aiosqlite:///{db_file.as_posix()}",
+        connect_args={"check_same_thread": False},
+    )
+
+    async def _init_schema():
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+    asyncio.run(_init_schema())
+
+    session_factory = async_sessionmaker(
+        bind=engine,
+        class_=AsyncSession,
+        expire_on_commit=False,
+        autocommit=False,
+        autoflush=False,
+    )
+
+    async def _override_get_db():
+        async with session_factory() as session:
+            try:
+                yield session
+                await session.commit()
+            except Exception:
+                await session.rollback()
+                raise
+            finally:
+                await session.close()
+
+    app.dependency_overrides[get_db] = _override_get_db
+    yield
+    app.dependency_overrides.pop(get_db, None)
+
+    async def _cleanup():
+        await engine.dispose()
+    asyncio.run(_cleanup())
 
 
 def _generate_test_image(format_str: str = "JPEG", size=(64, 64), color="blue") -> bytes:

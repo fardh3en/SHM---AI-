@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useSearchParams, useLocation } from 'react-router-dom'
+import { useSearchParams, useLocation, Link } from 'react-router-dom'
 import {
   Layers,
   UploadCloud,
@@ -11,6 +11,8 @@ import {
   ScanLine,
   PlusCircle,
   Info,
+  FileText,
+  CheckCircle2,
 } from 'lucide-react'
 import PageHeader from '../../components/layout/PageHeader'
 import Button from '../../components/ui/Button'
@@ -52,7 +54,12 @@ export default function InspectionStudioPage() {
   const location = useLocation()
   const initialAssetId = searchParams.get('asset_id')
   const initialEvidencePath = searchParams.get('evidence_path')
-  const initialInspectionId = searchParams.get('inspection_id') || searchParams.get('inspectionId')
+  const isNew = searchParams.get('new') === 'true'
+  const urlInspectionId = searchParams.get('inspection_id') || searchParams.get('inspectionId')
+  const storedInspectionId = !isNew && typeof window !== 'undefined'
+    ? window.localStorage?.getItem('shm_active_inspection_id')
+    : null
+  const initialInspectionId = urlInspectionId || storedInspectionId || null
 
   // Step state — defaults to Step 1: Upload Crack Photograph (Photo-First)
   const [step, setStep] = useState<Step>(1)
@@ -67,6 +74,7 @@ export default function InspectionStudioPage() {
   const [mediaFile, setMediaFile] = useState<SelectedMediaFile | null>(null)
   const [triggerVisionPipeline, setTriggerVisionPipeline] = useState<boolean>(true)
   const [retryInspectionId, setRetryInspectionId] = useState<string | null>(null)
+  const [showReplaceUpload, setShowReplaceUpload] = useState<boolean>(false)
 
   // Result state
   const [completedInspection, setCompletedInspection] = useState<Inspection | null>(null)
@@ -91,6 +99,11 @@ export default function InspectionStudioPage() {
   // Handle continuing an existing inspection with persisted evidence
   useEffect(() => {
     if (existingInspection) {
+      try {
+        localStorage.setItem('shm_active_inspection_id', existingInspection.id)
+      } catch {
+        // ignore
+      }
       if (existingInspection.input_path && !mediaFile) {
         setMediaFile({
           previewUrl: resolveMediaUrl(existingInspection.input_path),
@@ -101,13 +114,25 @@ export default function InspectionStudioPage() {
       }
       if (existingInspection.status === 'completed') {
         setCompletedInspection(existingInspection)
-        setStep(4)
+        const stepParam = searchParams.get('step')
+        if (stepParam) {
+          const parsed = parseInt(stepParam, 10)
+          if (parsed >= 1 && parsed <= 4) setStep(parsed as Step)
+        } else {
+          setStep(4)
+        }
       } else {
         setRetryInspectionId(existingInspection.id)
-        setStep(3)
+        const stepParam = searchParams.get('step')
+        if (stepParam) {
+          const parsed = parseInt(stepParam, 10)
+          if (parsed >= 1 && parsed <= 4) setStep(parsed as Step)
+        } else {
+          setStep(3)
+        }
       }
     }
-  }, [existingInspection])
+  }, [existingInspection, searchParams])
 
   // If existing inspection loaded and asset not yet set, match it
   useEffect(() => {
@@ -347,12 +372,18 @@ export default function InspectionStudioPage() {
     setCompletedInspection(null)
     setSubmissionError(null)
     setRetryInspectionId(null)
+    setShowReplaceUpload(false)
   }
 
   // Explicitly start a fresh inspection without query parameters
   const handleStartNewInspection = () => {
+    try {
+      localStorage.removeItem('shm_active_inspection_id')
+    } catch {
+      // ignore
+    }
     handleResetWorkflow()
-    setSearchParams({}, { replace: true })
+    setSearchParams({ new: 'true' }, { replace: true })
   }
 
   return (
@@ -440,46 +471,165 @@ export default function InspectionStudioPage() {
           </div>
         </nav>
 
-        {/* ── Step 1: Upload Crack Photograph (Photo-First) ── */}
+        {/* ── Step 1: Upload / Active Photographic Evidence ── */}
         {step === 1 && (
           <div className={styles.workspace}>
-            <div className={styles.stepCard}>
-              <div className={styles.stepHeader}>
-                <h2 className={styles.stepTitle}>Step 1: Upload Crack Photograph</h2>
-                <p className={styles.stepSubtitle}>
-                  Start by uploading or dropping a high-resolution photograph of the structural crack
-                  or defect.
-                </p>
+            {existingInspection?.input_path && !showReplaceUpload ? (
+              <div className={styles.activeEvidenceCard}>
+                <div className={styles.activeEvidenceHeader}>
+                  <div className={styles.activeEvidenceTitle}>
+                    <CheckCircle2 size={18} color="var(--brand-primary)" />
+                    <span>Active Inspection Photographic Evidence</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <StatusChip status={existingInspection.status} size="sm" />
+                    <button
+                      type="button"
+                      onClick={() => setShowReplaceUpload(true)}
+                      className={styles.secondaryActionBtn}
+                      style={{ fontSize: '0.75rem', padding: '4px 8px' }}
+                      title="Upload a replacement photograph for this inspection record"
+                    >
+                      <UploadCloud size={13} /> Replace Image
+                    </button>
+                  </div>
+                </div>
+
+                <div className={styles.activeEvidenceGrid}>
+                  <div className={styles.activeEvidenceThumbContainer}>
+                    <img
+                      src={resolveMediaUrl(existingInspection.input_path)}
+                      alt="Inspection photographic evidence"
+                      className={styles.activeEvidenceThumb}
+                    />
+                  </div>
+
+                  <div className={styles.activeEvidenceMeta}>
+                    <div className={styles.metaGrid}>
+                      <div className={styles.metaItem}>
+                        <span className={styles.metaLabel}>Structure</span>
+                        <span className={styles.metaValue}>
+                          {selectedAsset?.name || 'Monitored Structure'}
+                        </span>
+                      </div>
+                      <div className={styles.metaItem}>
+                        <span className={styles.metaLabel}>Inspection ID</span>
+                        <span className={styles.metaValue} style={{ fontFamily: 'var(--font-mono)' }}>
+                          #{existingInspection.id.slice(0, 8)}
+                        </span>
+                      </div>
+                      <div className={styles.metaItem}>
+                        <span className={styles.metaLabel}>Defect Count</span>
+                        <span className={styles.metaValue}>
+                          {existingInspection.defect_count ?? 0} identified
+                        </span>
+                      </div>
+                      <div className={styles.metaItem}>
+                        <span className={styles.metaLabel}>Health Score</span>
+                        <span className={styles.metaValue}>
+                          {existingInspection.health_score !== null
+                            ? `${existingInspection.health_score.toFixed(1)} / 100`
+                            : 'Pending'}
+                        </span>
+                      </div>
+                      <div className={styles.metaItem}>
+                        <span className={styles.metaLabel}>Date Captured</span>
+                        <span className={styles.metaValue}>
+                          {formatDate(existingInspection.created_at)}
+                        </span>
+                      </div>
+                      <div className={styles.metaItem}>
+                        <span className={styles.metaLabel}>Evidence Path</span>
+                        <span className={styles.metaValue} style={{ wordBreak: 'break-all', fontSize: '0.75rem' }}>
+                          {existingInspection.input_path.split('/').pop()}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className={styles.activeEvidenceActions}>
+                      <Link
+                        to={`/vision?inspectionId=${existingInspection.id}`}
+                        className={styles.primaryVisionBtn}
+                        title="Open full interactive vision defect analysis and segmentation"
+                      >
+                        <ScanLine size={16} /> Open in Vision Analysis
+                      </Link>
+
+                      {existingInspection.status === 'completed' && (
+                        <button
+                          type="button"
+                          className={styles.secondaryActionBtn}
+                          onClick={() => setStep(4)}
+                        >
+                          <FileText size={15} /> View Diagnostic Findings
+                        </button>
+                      )}
+
+                      <button
+                        type="button"
+                        className={styles.secondaryActionBtn}
+                        onClick={handleStartNewInspection}
+                        title="Start a fresh inspection with a different crack photograph"
+                      >
+                        <PlusCircle size={15} /> Analyze Another Image
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </div>
+            ) : (
+              <div className={styles.stepCard}>
+                <div className={styles.stepHeader}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <h2 className={styles.stepTitle}>Step 1: Upload Crack Photograph</h2>
+                      <p className={styles.stepSubtitle}>
+                        Start by uploading or dropping a high-resolution photograph of the structural crack
+                        or defect.
+                      </p>
+                    </div>
+                    {showReplaceUpload && existingInspection?.input_path && (
+                      <button
+                        type="button"
+                        onClick={() => setShowReplaceUpload(false)}
+                        className={styles.secondaryActionBtn}
+                        style={{ fontSize: '0.75rem' }}
+                      >
+                        Cancel &amp; Keep Current Photo
+                      </button>
+                    )}
+                  </div>
+                </div>
 
-              <EvidenceUploader
-                assetId={selectedAsset?.id}
-                source={source}
-                onChangeSource={setSource}
-                notes={notes}
-                onChangeNotes={setNotes}
-                mediaFile={mediaFile}
-                onSelectMediaFile={setMediaFile}
-                selectedTags={selectedTags}
-                onToggleTag={handleToggleTag}
-              />
+                <EvidenceUploader
+                  assetId={selectedAsset?.id}
+                  source={source}
+                  onChangeSource={setSource}
+                  notes={notes}
+                  onChangeNotes={setNotes}
+                  mediaFile={mediaFile}
+                  onSelectMediaFile={setMediaFile}
+                  selectedTags={selectedTags}
+                  onToggleTag={handleToggleTag}
+                />
 
-              <div className={styles.stepFooter}>
-                <span style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
-                  {mediaFile
-                    ? `Staged: ${mediaFile.caption ?? 'Crack photo'} (${mediaFile.formattedSize})`
-                    : 'Select or drop an image above to continue.'}
-                </span>
+                <div className={styles.stepFooter}>
+                  <span style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
+                    {mediaFile
+                      ? `Staged: ${mediaFile.caption ?? 'Crack photo'} (${mediaFile.formattedSize})`
+                      : 'Select or drop an image above to continue.'}
+                  </span>
 
-                <Button
-                  variant="primary"
-                  disabled={!mediaFile}
-                  onClick={() => setStep(2)}
-                >
-                  Configure Structure &amp; Context <ChevronRight size={16} />
-                </Button>
+                  <Button
+                    variant="primary"
+                    disabled={!mediaFile}
+                    onClick={() => setStep(2)}
+                  >
+                    Configure Structure &amp; Context <ChevronRight size={16} />
+                  </Button>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         )}
 
@@ -797,6 +947,7 @@ export default function InspectionStudioPage() {
                       <th>Defects</th>
                       <th>Health Score</th>
                       <th>Status</th>
+                      <th>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -815,6 +966,34 @@ export default function InspectionStudioPage() {
                         </td>
                         <td>
                           <StatusChip status={insp.status} size="sm" />
+                        </td>
+                        <td>
+                          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                try {
+                                  localStorage.setItem('shm_active_inspection_id', insp.id)
+                                } catch {
+                                  // ignore
+                                }
+                                setSearchParams({ inspectionId: insp.id })
+                              }}
+                              className={styles.secondaryActionBtn}
+                              style={{ padding: '2px 8px', fontSize: '0.75rem' }}
+                              title="Load this inspection in the studio"
+                            >
+                              Select
+                            </button>
+                            <Link
+                              to={`/vision?inspectionId=${insp.id}`}
+                              className={styles.secondaryActionBtn}
+                              style={{ padding: '2px 8px', fontSize: '0.75rem' }}
+                              title="Open in Vision Analysis"
+                            >
+                              Vision
+                            </Link>
+                          </div>
                         </td>
                       </tr>
                     ))}

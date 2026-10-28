@@ -94,18 +94,19 @@ def _is_transient_network_error(exc: Exception) -> bool:
     return False
 
 
-def _resolve_download_source(target_name: str) -> tuple[str, dict[str, str]]:
+def _resolve_download_source(target_name: str, target_filename: str | None = None) -> tuple[str, dict[str, str]]:
     """
     Resolve the download URL and request headers for the requested model.
 
     Returns:
         tuple[url, headers]
     """
+    resolved_file = target_filename or target_name
     custom_url = os.environ.get("MODEL_WEIGHTS_URL")
     if custom_url:
         return custom_url.strip(), {}
 
-    if target_name == HF_CRACK_MODEL_NAME:
+    if target_name == HF_CRACK_MODEL_NAME or resolved_file == HF_CRACK_MODEL_NAME:
         token = (
             os.environ.get("HF_TOKEN")
             or os.environ.get("HUGGINGFACE_TOKEN")
@@ -129,12 +130,12 @@ def _resolve_download_source(target_name: str) -> tuple[str, dict[str, str]]:
         }
         return HF_CRACK_URL, headers
 
-    # Default production model (yolo11n-seg.pt)
+    # Default production models from Ultralytics or upstream assets
     headers = {
         "User-Agent": "SHM-AI-Provisioner/1.0 (Render-Build; +https://github.com/fardh3en/SHM---AI-)",
         "Accept": "application/octet-stream,*/*",
     }
-    return f"{ULTRALYTICS_RELEASE_URL}/{target_name}", headers
+    return f"{ULTRALYTICS_RELEASE_URL}/{resolved_file}", headers
 
 
 def download_weights(
@@ -163,8 +164,13 @@ def download_weights(
         bool: True if weights are present and verified on disk, False otherwise.
     """
     settings = get_settings()
-    target_name = model_name or settings.DEFAULT_MODEL_NAME
-    dest_path = settings.WEIGHTS_DIR / target_name
+    target_name = (model_name or getattr(settings, "DEFAULT_MODEL_NAME", "yolo11n-seg.pt")).strip()
+    aliases = getattr(settings, "MODEL_ALIASES", {})
+    if isinstance(aliases, dict):
+        target_filename = aliases.get(target_name.lower(), target_name)
+    else:
+        target_filename = target_name
+    dest_path = settings.WEIGHTS_DIR / target_filename
     settings.WEIGHTS_DIR.mkdir(parents=True, exist_ok=True)
 
     # ── Check if already present and valid ───────────────────────────────────
@@ -181,8 +187,8 @@ def download_weights(
             )
 
     try:
-        url, req_headers = _resolve_download_source(target_name)
-    except PermissionError as perm_err:
+        url, req_headers = _resolve_download_source(target_name, target_filename)
+    except (PermissionError, FileNotFoundError) as perm_err:
         print(f"Provisioning aborted: {perm_err}", file=sys.stderr)
         return False
 

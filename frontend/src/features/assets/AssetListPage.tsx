@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
-import { Search, Plus, MapPin, ArrowRight, Layers, Camera } from 'lucide-react'
+import { Search, Plus, MapPin, ArrowRight, Layers, Camera, Filter } from 'lucide-react'
 import PageHeader from '../../components/layout/PageHeader'
 import MetricCard from '../../components/ui/MetricCard'
 import StatusChip from '../../components/ui/StatusChip'
@@ -11,6 +11,38 @@ import AssetCreateModal from './AssetCreateModal'
 import { useAssets } from '../../hooks/useAssets'
 import type { Asset, AssetStatus } from '../../api/assets'
 import styles from './AssetListPage.module.css'
+
+export function isTestFixture(asset: { name: string; description?: string | null }): boolean {
+  const n = asset.name.toLowerCase().trim()
+  const d = (asset.description || '').toLowerCase()
+  return (
+    n.startsWith('test') ||
+    n.includes('test ') ||
+    n.includes(' test') ||
+    n.includes('e2e') ||
+    n.includes('end-to-end') ||
+    n.includes('ordering test') ||
+    n.includes('upload pier') ||
+    n.includes('staticpool') ||
+    n.includes('mock') ||
+    n.includes('fixture') ||
+    d.includes('test fixture') ||
+    d.includes('automated test')
+  )
+}
+
+export function hasArchivedEvidence(asset: Asset): boolean {
+  if (asset.latest_health_score !== null) return true
+  const d = (asset.description || '').toLowerCase()
+  return (
+    d.includes('evidence') ||
+    d.includes('photograph') ||
+    d.includes('crack') ||
+    d.includes('inspection') ||
+    d.includes('camera') ||
+    d.includes('image')
+  )
+}
 
 function getStatusClass(status: AssetStatus): string {
   switch (status) {
@@ -30,17 +62,25 @@ function getHealthClass(score: number | null): string {
 }
 
 export default function AssetListPage() {
-  const { data, isLoading, isError, refetch } = useAssets(1, 100)
+  const { data, isLoading, isError, refetch } = useAssets(1, 250)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedType, setSelectedType] = useState<string>('all')
   const [selectedStatus, setSelectedStatus] = useState<string>('all')
+  const [hideTestFixtures, setHideTestFixtures] = useState<boolean>(true)
 
   const assets: Asset[] = useMemo(() => data?.items ?? [], [data?.items])
 
+  const testFixtureCount = useMemo(() => assets.filter(isTestFixture).length, [assets])
+
+  // Base assets: conditionally exclude automated test fixtures
+  const baseAssets = useMemo(() => {
+    return hideTestFixtures ? assets.filter((a) => !isTestFixture(a)) : assets
+  }, [assets, hideTestFixtures])
+
   // Filtering
   const filteredAssets = useMemo(() => {
-    return assets.filter((asset) => {
+    return baseAssets.filter((asset) => {
       // Type filter
       if (selectedType !== 'all' && asset.asset_type !== selectedType) {
         return false
@@ -59,13 +99,13 @@ export default function AssetListPage() {
       }
       return true
     })
-  }, [assets, selectedType, selectedStatus, searchQuery])
+  }, [baseAssets, selectedType, selectedStatus, searchQuery])
 
-  // Summary Metrics
-  const totalCount = data?.total ?? assets.length
-  const activeCount = assets.filter((a) => a.status === 'active').length
-  const maintenanceCount = assets.filter((a) => a.status === 'under_maintenance').length
-  const scoredAssets = assets.filter((a) => a.latest_health_score !== null)
+  // Summary Metrics (reflects base active view)
+  const totalCount = baseAssets.length
+  const activeCount = baseAssets.filter((a) => a.status === 'active').length
+  const maintenanceCount = baseAssets.filter((a) => a.status === 'under_maintenance').length
+  const scoredAssets = baseAssets.filter((a) => a.latest_health_score !== null)
   const avgHealthScore = scoredAssets.length > 0
     ? (scoredAssets.reduce((sum, a) => sum + (a.latest_health_score ?? 0), 0) / scoredAssets.length).toFixed(1)
     : '—'
@@ -162,6 +202,32 @@ export default function AssetListPage() {
             <option value="decommissioned">Decommissioned</option>
           </select>
 
+          <div className={styles.fixtureToggleWrap}>
+            <button
+              type="button"
+              onClick={() => setHideTestFixtures((prev) => !prev)}
+              className={[
+                styles.fixtureToggleBtn,
+                hideTestFixtures ? styles.fixtureToggleBtnActive : '',
+              ].join(' ')}
+              title={
+                hideTestFixtures
+                  ? 'Showing civil infrastructure only. Click to display test fixtures.'
+                  : 'Showing all assets including automated test fixtures.'
+              }
+            >
+              <Filter size={13} />
+              <span>{hideTestFixtures ? 'Civil Structures' : 'All Structures'}</span>
+            </button>
+            {testFixtureCount > 0 && (
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                {hideTestFixtures
+                  ? `(${testFixtureCount} test fixtures hidden)`
+                  : `(${testFixtureCount} fixtures)`}
+              </span>
+            )}
+          </div>
+
           <span className={styles.resultCount}>
             {filteredAssets.length} of {totalCount} structures
           </span>
@@ -207,9 +273,21 @@ export default function AssetListPage() {
                     <div>
                       <div className={styles.cardTags}>
                         <span className={styles.cardCategory}>{asset.asset_type}</span>
-                        <span className={styles.evidenceTag} title="Visual photographic evidence available in asset dossier">
-                          <Camera size={10} /> Archived Evidence
-                        </span>
+                        {isTestFixture(asset) ? (
+                          <span
+                            className={styles.testBadge}
+                            title="Automated testing fixture artifact"
+                          >
+                            Test Fixture
+                          </span>
+                        ) : hasArchivedEvidence(asset) ? (
+                          <span
+                            className={styles.evidenceTag}
+                            title="Visual photographic evidence available in asset dossier"
+                          >
+                            <Camera size={10} /> Archived Evidence
+                          </span>
+                        ) : null}
                       </div>
                       <h3 className={styles.cardName}>{asset.name}</h3>
                     </div>

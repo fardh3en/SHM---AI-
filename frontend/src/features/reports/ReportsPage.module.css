@@ -195,17 +195,115 @@
   color: #353B32;
 }
 
+.previewBtnPrimary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  background: #353B32;
+  border: 1px solid #353B32;
+  border-radius: 0px;
+  font-family: var(--font-mono, monospace);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #F0EDE4;
+  cursor: pointer;
+  text-decoration: none;
+  transition: all 0.15s ease;
+}
+
+.previewBtnPrimary:hover {
+  background: #464D43;
+  border-color: #464D43;
+  color: #FFFFFF;
+}
+
 .iframeWrapper {
   width: 100%;
-  height: 780px;
+  min-height: 580px;
+  height: 75vh;
+  max-height: 850px;
   background: #FAF9F5;
   border: none;
+  position: relative;
 }
 
 .reportIframe {
   width: 100%;
   height: 100%;
   border: none;
+  display: block;
+}
+
+.iframeLoading {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: #FAF9F5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  font-family: var(--font-mono, monospace);
+  font-size: 0.8125rem;
+  color: #77766D;
+  z-index: 2;
+}
+
+.iframeError {
+  padding: 40px 24px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  color: #9D3E32;
+  font-family: var(--font-mono, monospace);
+  font-size: 0.875rem;
+}
+
+/* ── Empty Preview State ───────────────────────────────────────────── */
+.emptyPreviewSection {
+  background: #FAF9F5;
+  border: 1px dashed #DCD7CC;
+  border-radius: 0px;
+  padding: 48px 32px;
+  text-align: center;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.emptyPreviewCard {
+  max-width: 540px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.emptyPreviewIcon {
+  color: #77766D;
+  opacity: 0.6;
+}
+
+.emptyPreviewTitle {
+  font-family: var(--font-heading, 'DM Serif Display', Georgia, serif);
+  font-size: 1.25rem;
+  font-weight: 500;
+  color: #353B32;
+  margin: 0;
+}
+
+.emptyPreviewDesc {
+  font-family: var(--font-body, 'Inter', sans-serif);
+  font-size: 0.875rem;
+  color: #77766D;
+  line-height: 1.5;
+  margin: 0;
 }
 
 /* ── Archive Table ─────────────────────────────────────────────────── */

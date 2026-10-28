@@ -44,7 +44,7 @@ async def create_asset(
 async def list_assets(
     service: AssetServiceDep,
     page: int = Query(default=1, ge=1, description="Page number (1-indexed)."),
-    page_size: int = Query(default=20, ge=1, le=100, description="Items per page."),
+    page_size: int = Query(default=20, ge=1, le=500, description="Items per page."),
 ) -> PaginatedResponse[AssetResponse]:
     """Paginated asset list."""
     items, total = await service.list_assets(page=page, page_size=page_size)

@@ -34,6 +34,7 @@ export interface ReportGenerateResponse {
   currency: string
   html_content: string
   pdf_available: boolean
+  pdf_filename?: string | null
   notes: string | null
 }
 
@@ -44,4 +45,6 @@ export const reportsApi = {
     apiPost<ReportGenerateResponse>('/api/v1/reports/generate', data),
 
   getFileUrl: (filename: string) => `/api/v1/reports/${filename}`,
+
+  getPdfUrl: (filename: string) => `/api/v1/reports/${filename.replace(/\.html$/, '')}/pdf`,
 }

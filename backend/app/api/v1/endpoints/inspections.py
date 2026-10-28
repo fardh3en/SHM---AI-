@@ -52,7 +52,7 @@ async def create_inspection(
 async def list_inspections(
     service: InspectionServiceDep,
     page: int = Query(default=1, ge=1, description="Page number (1-indexed)."),
-    page_size: int = Query(default=20, ge=1, le=100, description="Items per page."),
+    page_size: int = Query(default=20, ge=1, le=500, description="Items per page."),
 ) -> PaginatedResponse[InspectionResponse]:
     """Paginated inspection list."""
     items, total = await service.list_inspections(page=page, page_size=page_size)

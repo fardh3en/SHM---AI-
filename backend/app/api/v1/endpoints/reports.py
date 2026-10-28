@@ -375,11 +375,15 @@ async def generate_report(
         image_data_uri=image_data_uri,
     )
 
-    # 7. Persist report file
+    # 7. Persist report file (HTML and PDF)
     report_id = str(uuid.uuid4())
-    filename = f"report_{asset.id[:8]}_{inspection.id[:8]}_{timestamp_str}.html"
+    base_stem = f"report_{asset.id[:8]}_{inspection.id[:8]}_{timestamp_str}"
+    filename = f"{base_stem}.html"
+    pdf_filename = f"{base_stem}.pdf"
     settings.REPORTS_DIR.mkdir(parents=True, exist_ok=True)
     output_path = settings.REPORTS_DIR / filename
+    pdf_output_path = settings.REPORTS_DIR / pdf_filename
+
     try:
         with open(output_path, "w", encoding="utf-8") as f:
             f.write(html_content)
@@ -389,6 +393,16 @@ async def generate_report(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to save report to server filesystem.",
         )
+
+    # Attempt PDF generation
+    pdf_available = False
+    try:
+        pdf_bytes = generator.generate_pdf_from_html(html_content)
+        pdf_output_path.write_bytes(pdf_bytes)
+        pdf_available = True
+        logger.info(f"Engineering report PDF generated successfully: {pdf_filename} ({len(pdf_bytes)} bytes)")
+    except Exception as pdf_exc:
+        logger.warning(f"Server-side PDF generation skipped or failed: {pdf_exc}")
 
     return ReportGenerateResponse(
         report_id=report_id,
@@ -404,8 +418,51 @@ async def generate_report(
         cost_estimate_high=rec_report.cost_estimate.high,
         currency=rec_report.cost_estimate.currency,
         html_content=html_content,
-        pdf_available=False,
+        pdf_available=pdf_available,
+        pdf_filename=pdf_filename if pdf_available else None,
         notes=inspection.notes,
+    )
+
+
+@router.get(
+    "/{filename}/pdf",
+    summary="Download report as PDF",
+    description="Retrieve or dynamically convert an engineering report to PDF.",
+    responses={
+        404: {"description": "Report file not found"},
+    },
+)
+async def get_report_pdf(filename: str, settings: AppSettings):
+    """Serve or dynamically generate a PDF version of an engineering report."""
+    safe_name = os.path.basename(filename)
+    stem = os.path.splitext(safe_name)[0]
+    pdf_name = f"{stem}.pdf"
+    pdf_path = (settings.REPORTS_DIR / pdf_name).resolve()
+    html_path = (settings.REPORTS_DIR / f"{stem}.html").resolve()
+
+    if not pdf_path.is_file():
+        if not html_path.is_file() or not html_path.is_relative_to(settings.REPORTS_DIR.resolve()):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Report file '{safe_name}' not found.",
+            )
+        try:
+            generator = ReportGenerator()
+            html_content = html_path.read_text(encoding="utf-8")
+            pdf_bytes = generator.generate_pdf_from_html(html_content)
+            pdf_path.write_bytes(pdf_bytes)
+        except Exception as exc:
+            logger.error(f"On-demand PDF conversion failed for {safe_name}: {exc}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to generate PDF from report: {exc}",
+            )
+
+    return FileResponse(
+        pdf_path,
+        media_type="application/pdf",
+        filename=pdf_name,
+        headers={"Content-Disposition": f'attachment; filename="{pdf_name}"'},
     )
 
 
@@ -428,5 +485,12 @@ async def get_report_file(filename: str, settings: AppSettings):
             detail=f"Report file '{safe_name}' not found.",
         )
 
-    media_type = "text/html; charset=utf-8" if safe_name.endswith(".html") else "application/pdf"
-    return FileResponse(file_path, media_type=media_type, filename=safe_name)
+    is_html = safe_name.endswith(".html")
+    media_type = "text/html; charset=utf-8" if is_html else "application/pdf"
+    content_disposition_type = "inline" if is_html else "attachment"
+    return FileResponse(
+        file_path,
+        media_type=media_type,
+        filename=safe_name,
+        content_disposition_type=content_disposition_type,
+    )

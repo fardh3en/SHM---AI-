@@ -15,6 +15,10 @@ from __future__ import annotations
 import datetime
 import base64
 import mimetypes
+import os
+import shutil
+import subprocess
+import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, cast
@@ -292,6 +296,26 @@ def _build_context(
 # ---------------------------------------------------------------------------
 
 
+def _find_chromium_executable() -> Path | None:
+    """Find a local Chromium-based browser (Edge, Chrome, Chromium) for headless PDF export."""
+    candidates = [
+        Path(os.environ.get("PROGRAMFILES(X86)", r"C:\Program Files (x86)")) / r"Microsoft\Edge\Application\msedge.exe",
+        Path(os.environ.get("PROGRAMFILES", r"C:\Program Files")) / r"Microsoft\Edge\Application\msedge.exe",
+        Path(os.environ.get("PROGRAMFILES", r"C:\Program Files")) / r"Google\Chrome\Application\chrome.exe",
+        Path(os.environ.get("PROGRAMFILES(X86)", r"C:\Program Files (x86)")) / r"Google\Chrome\Application\chrome.exe",
+        Path(os.environ.get("LOCALAPPDATA", "")) / r"Microsoft\Edge\Application\msedge.exe",
+        Path(os.environ.get("LOCALAPPDATA", "")) / r"Google\Chrome\Application\chrome.exe",
+    ]
+    for cand in candidates:
+        if cand.is_file():
+            return cand
+    for name in ("msedge", "chrome", "google-chrome", "chromium", "chromium-browser"):
+        found = shutil.which(name)
+        if found:
+            return Path(found)
+    return None
+
+
 class ReportGenerator:
     """
     Converts a RecommendationReport into an HTML string or PDF bytes.
@@ -342,44 +366,57 @@ class ReportGenerator:
         )
         return template.render(**context)
 
+    def generate_pdf_from_html(self, html: str) -> bytes:
+        """Convert a rendered HTML report string into high-fidelity PDF bytes."""
+        # 1. Prefer headless Chromium / Edge (fast, pixel-perfect modern CSS/SVG support)
+        browser_exe = _find_chromium_executable()
+        if browser_exe:
+            with tempfile.NamedTemporaryFile("w", suffix=".html", delete=False, encoding="utf-8") as f:
+                f.write(html)
+                tmp_html = Path(f.name)
+            tmp_pdf = tmp_html.with_suffix(".pdf")
+            try:
+                cmd = [
+                    str(browser_exe),
+                    "--headless",
+                    "--disable-gpu",
+                    "--no-pdf-header-footer",
+                    f"--print-to-pdf={tmp_pdf}",
+                    tmp_html.as_uri(),
+                ]
+                proc = subprocess.run(cmd, capture_output=True, text=True, timeout=45)
+                if proc.returncode == 0 and tmp_pdf.is_file():
+                    return tmp_pdf.read_bytes()
+            finally:
+                if tmp_html.is_file():
+                    try:
+                        tmp_html.unlink()
+                    except OSError:
+                        pass
+                if tmp_pdf.is_file():
+                    try:
+                        tmp_pdf.unlink()
+                    except OSError:
+                        pass
+
+        # 2. Fallback to WeasyPrint if installed
+        try:
+            import weasyprint
+            return cast("bytes", weasyprint.HTML(string=html).write_pdf())
+        except ImportError:
+            pass
+
+        raise RuntimeError(
+            "PDF generation requires a Chromium-based browser (Microsoft Edge or Google Chrome) "
+            "or the WeasyPrint Python package."
+        )
+
     def generate_pdf(
         self,
         input: RecommendationInput,
         report: RecommendationReport,
-        generated_at_utc: str | None = None,
-        asset_name: str | None = None,
-        input_image_path: str | None = None,
-        detections: list[dict[str, Any]] | None = None,
-        assessment_meta: dict[str, Any] | None = None,
-        image_quality: dict[str, Any] | None = None,
-        calibration_info: dict[str, Any] | None = None,
-        model_name: str | None = None,
-        image_width: int = 1000,
-        image_height: int = 1000,
-        image_data_uri: str | None = None,
+        **kwargs: Any,
     ) -> bytes:
         """Render the report as a PDF byte stream."""
-        try:
-            import weasyprint
-        except ImportError:
-            raise RuntimeError(
-                "WeasyPrint is required for PDF generation but is not installed.\n"
-                "Install it with:  pip install 'shm-ai[reports]'\n"
-            ) from None
-
-        html = self.render_html(
-            input=input,
-            report=report,
-            generated_at_utc=generated_at_utc,
-            asset_name=asset_name,
-            input_image_path=input_image_path,
-            detections=detections,
-            assessment_meta=assessment_meta,
-            image_quality=image_quality,
-            calibration_info=calibration_info,
-            model_name=model_name,
-            image_width=image_width,
-            image_height=image_height,
-            image_data_uri=image_data_uri,
-        )
-        return cast("bytes", weasyprint.HTML(string=html).write_pdf())
+        html = self.render_html(input=input, report=report, **kwargs)
+        return self.generate_pdf_from_html(html)

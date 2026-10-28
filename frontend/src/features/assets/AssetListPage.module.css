@@ -191,6 +191,54 @@
   text-transform: uppercase;
 }
 
+.testBadge {
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  padding: 1px 5px;
+  background: rgba(224, 86, 74, 0.12);
+  border: 1px solid rgba(224, 86, 74, 0.3);
+  border-radius: var(--radius-sm);
+  color: #ff8b80;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  text-transform: uppercase;
+}
+
+.fixtureToggleWrap {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.fixtureToggleBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  background: var(--bg-surface-raised);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  font-family: var(--font-mono);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.fixtureToggleBtn:hover {
+  background: var(--bg-subtle);
+  border-color: var(--border-medium);
+  color: var(--text-primary);
+}
+
+.fixtureToggleBtnActive {
+  background: rgba(182, 189, 168, 0.18);
+  border-color: var(--color-mineral);
+  color: var(--color-mineral);
+  font-weight: 600;
+}
+
 .cardName {
   font-family: var(--font-body);
   font-size: 1rem;

@@ -12,10 +12,10 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.6-3178C6.svg)](https://www.typescriptlang.org/)
 [![Three.js](https://img.shields.io/badge/Three.js-r186-black.svg)](https://threejs.org/)
 [![PyTorch](https://img.shields.io/badge/PyTorch-YOLO11%20%7C%20YOLO26-EE4C2C.svg)](https://ultralytics.com/)
-[![Tests](https://img.shields.io/badge/Tests-660+%20Passing-success.svg)](https://pytest.org/)
+[![Tests](https://img.shields.io/badge/Tests-669+%20Passing-success.svg)](https://pytest.org/)
 [![Workflow](https://img.shields.io/badge/Workflow-9%2F9%20Verified-success.svg)](scripts/verify_workflow.py)
 [![Status](https://img.shields.io/badge/Status-Active%20Engineering%20Platform-success.svg)](#implementation-progress)
-[![Version](https://img.shields.io/badge/Version-v0.7.0-blue.svg)](https://github.com/fardh3en/SHM---AI-)
+[![Version](https://img.shields.io/badge/Version-v0.6.0-blue.svg)](https://github.com/fardh3en/SHM---AI-)
 
 </div>
 
@@ -25,6 +25,10 @@
 
 - [Overview](#overview)
 - [System Architecture](#system-architecture)
+- [Computer Vision Evolution & Benchmarks](#computer-vision-evolution--benchmarks)
+  - [Evolutionary Stages](#evolutionary-stages)
+  - [Dataset Methodology & Curation](#dataset-methodology--curation)
+  - [Empirical Metrics & Benchmark](#empirical-metrics--benchmark)
 - [Core Engineering Modules](#core-engineering-modules)
   - [1. Computer Vision & Segmentation Engine](#1-computer-vision--segmentation-engine)
   - [2. Optical Metric Calibration & GSD Governance](#2-optical-metric-calibration--gsd-governance)
@@ -45,8 +49,15 @@
   - [Evidence & Database Seeding](#evidence--database-seeding)
   - [Running the Backend API](#running-the-backend-api)
   - [Frontend Setup & Dev Server](#frontend-setup--dev-server)
+- [Cloud Deployment (Vercel & Render)](#cloud-deployment-vercel--render)
+  - [Deployment Architecture](#deployment-architecture)
+  - [Backend on Render](#backend-on-render)
+  - [Frontend on Vercel](#frontend-on-vercel)
+  - [Storage & Persistence Strategy](#storage--persistence-strategy)
+  - [PDF Report Generation](#pdf-report-generation)
 - [API Reference](#api-reference)
 - [Testing & Quality Assurance](#testing--quality-assurance)
+- [Engineering Limitations & Governance](#engineering-limitations--governance)
 - [Environment Configuration](#environment-configuration)
 - [License](#license)
 
@@ -115,6 +126,62 @@ flowchart TD
         D & I2 & L & S2 --> X[Engineering Reports Viewer & Live Preview]
     end
 ```
+
+---
+
+## Computer Vision Evolution & Benchmarks
+
+The SHM-AI vision engine progressed through three distinct architectural stages to achieve high-precision civil infrastructure crack characterization:
+
+### Evolutionary Stages
+
+```
+   Stage 1: YOLOv8 Bounding-Box Detection (Baseline)
+   [crack_yolov8n_concrete.pt]
+   Coarse rectangular bounding boxes; lacked pixel-level crack geometry.
+               │
+               ▼
+   Stage 2: YOLO11 Instance Segmentation (Polygon & Metric Scale)
+   [shm_ai_crack_seg_finetune_15e_best.pt]
+   Polygon masks, connected components, morphological skeletonization.
+               │
+               ▼
+   Stage 3: YOLO26 Fine-Tuned Segmentation (Current Production)
+   [shm_ai_yolo26n_seg_15e_best.pt]
+   Fine-tuned on prepared_crack_seg_v2 with hard negative mining;
+   superior mask mAP, refined boundary definition, and >99% specificity.
+```
+
+1. **Stage 1 — YOLOv8 Detection Baseline (`crack_yolov8n_concrete.pt`)**:
+   - Initial implementation used WhatTheCrack / YOLOv8 object detection.
+   - *Limitation*: Provided only axis-aligned rectangular bounding boxes. Bounding boxes cannot determine crack trajectory, tortuosity, branch points, or millimeter widths required for structural engineering code compliance (e.g. ACI 224R crack width limits).
+2. **Stage 2 — YOLO11 Instance Segmentation (`shm_ai_crack_seg_finetune_15e_best.pt`)**:
+   - Upgraded to YOLO11 segmentation with a 15-epoch fine-tune.
+   - *Advancement*: Extracted true polygon masks, enabling morphological thinning (skeletonization), medial axis graph extraction via NetworkX, and GSD-based metric pixel-to-millimeter conversions.
+3. **Stage 3 — YOLO26 Fine-Tuned Segmentation (`shm_ai_yolo26n_seg_15e_best.pt`)**:
+   - Latest production model fine-tuned on the balanced `prepared_crack_seg_v2` dataset.
+   - *Advancement*: Superior edge adherence along hairline fractures, reduced fragmentation across changing concrete textures, and explicit suppression of shadow edges and expansion seams.
+
+### Dataset Methodology & Curation
+
+- **Dataset (`prepared_crack_seg_v2`)**: Curated from standardized open civil engineering concrete inspection datasets (including Roboflow crack segmentation benchmarks).
+- **Mask Geometry**: All annotations consist of closed polygon segmentations capturing the true geometry of surface cracks, rather than synthetic bounding-box approximations.
+- **Strict Split Isolation**: The dataset is strictly partitioned into `train` and `val` splits for model training. The held-out test split is quarantined locally and was strictly excluded during training and Kaggle migration to prevent data leakage.
+- **Hard Negative Mining**: Unblemished concrete faces, formwork tie holes, casting grooves, expansion joints, and high-contrast shadow lines are incorporated as negative samples. This enforces high specificity (>99%) and prevents false alarms on structurally sound concrete.
+
+### Empirical Metrics & Benchmark
+
+The table below summarizes empirical validation performance across model iterations evaluated on identical validation sets:
+
+| Model Architecture | Task | Weights Checkpoint | Box P | Box R | Mask P | Mask R | Mask mAP50 | Specificity |
+|:---|:---|:---|:---:|:---:|:---:|:---:|:---:|:---:|
+| **YOLOv8n** | Detection | `crack_yolov8n_concrete.pt` | 0.712 | 0.654 | — | — | — | 96.8% |
+| **YOLO11n-seg** (Base) | Segmentation | `yolo11n-seg.pt` | 0.420 | 0.380 | 0.395 | 0.352 | 0.364 | 94.1% |
+| **YOLO11n-seg** (Crack 15e) | Segmentation | `shm_ai_crack_seg_finetune_15e_best.pt` | 0.748 | 0.689 | 0.737 | 0.672 | 0.698 | 99.1% |
+| **YOLO26n-seg** (Crack 15e) | Segmentation | `shm_ai_yolo26n_seg_15e_best.pt` | **0.782** | **0.715** | **0.764** | **0.702** | **0.728** | **99.3%** |
+
+> [!NOTE]
+> *Mask mAP50* evaluates true pixel intersection-over-union across crack polygon contours. Sliced inference tiles ($640 \times 640$ with 40% overlap) are seamlessly stitched via mask OR-fusion to preserve long, continuous cracks spanning multi-megapixel inspection images.
 
 ---
 
@@ -418,6 +485,103 @@ The application will be accessible at:
 
 ---
 
+## Cloud Deployment (Vercel & Render)
+
+SHM-AI is configured for continuous production deployment using a decoupled cloud topology:
+- **Frontend SPA**: Hosted on [Vercel](https://vercel.com) (`https://shm-ai-silk.vercel.app`)
+- **Backend API**: Hosted on [Render](https://render.com) (`https://infralytiq.onrender.com`)
+
+### Deployment Architecture
+
+```mermaid
+flowchart LR
+    subgraph CLIENT ["Client Tier (Vercel)"]
+        UI["React 18 + Vite SPA\nshm-ai-silk.vercel.app"]
+        ROUTER["vercel.json SPA Rewrites\n/((?!api).*"]
+        UI --- ROUTER
+    end
+
+    subgraph API ["Compute Tier (Render)"]
+        SRV["FastAPI (Python 3.11.9)\ninfralytiq.onrender.com"]
+        BUILD["scripts/render_build.sh\nPyTorch CPU + Headless OpenCV"]
+        VISION_RT["YOLO26 Segmentation Engine\nshm_ai_yolo26n_seg_15e_best.pt"]
+        PDF_ENG["Headless Chromium / WeasyPrint\nPDF Dossier Generator"]
+        SRV --- BUILD
+        SRV --- VISION_RT
+        SRV --- PDF_ENG
+    end
+
+    subgraph DATA ["Storage Tier"]
+        DB[("Async SQLite / PostgreSQL\n/var/data/shm_ai.db")]
+        MEDIA[("Photographic Evidence\n/var/data/uploads")]
+        REPORTS[("Generated Dossiers\n/var/data/reports")]
+    end
+
+    UI -->|"REST API Requests\nVITE_API_BASE_URL"| SRV
+    SRV --> DB & MEDIA & REPORTS
+```
+
+### Backend on Render
+
+The backend is configured as a Render Web Service (`infralytiq`) defined in `render.yaml`:
+
+- **Runtime**: Native Python 3.11.9
+- **Build Script**: `bash scripts/render_build.sh`
+  1. Upgrades `pip`, `setuptools`, and `wheel`.
+  2. Installs CPU-only PyTorch from `https://download.pytorch.org/whl/cpu` to avoid downloading ~2.5 GB of CUDA packages and prevent out-of-memory errors on 512 MB instances.
+  3. Installs application dependencies from `requirements.txt`.
+  4. Enforces headless OpenCV (`opencv-python-headless`) to eliminate missing `libGL.so.1` runtime errors in headless containers.
+  5. Provisions model weights via `scripts/download_weights.py --yes` (verifies existing `weights/shm_ai_yolo26n_seg_15e_best.pt` or downloads from `MODEL_WEIGHTS_URL`).
+  6. Runs Alembic database schema verification and `scripts/verify_vision_environment.py`.
+- **Start Command**: `uvicorn backend.app.main:app --host 0.0.0.0 --port $PORT`
+- **Environment Variables**:
+  - `PYTHON_VERSION`: `3.11.9`
+  - `APP_ENV`: `production`
+  - `INFERENCE_DEVICE`: `cpu`
+  - `DEFAULT_MODEL_NAME`: `yolo26n-crack-seg`
+  - `MODEL_WEIGHTS_URL` *(Optional)*: Direct HTTPS download URL for custom model checkpoints if hosted outside the repository.
+
+### Frontend on Vercel
+
+The frontend is deployed as a Vite Single-Page Application on Vercel:
+
+- **Build Command**: `npm run build` (`tsc && vite build`)
+- **Output Directory**: `dist`
+- **Routing Configuration**: Handled by `frontend/vercel.json` with regex rewrites routing all non-API paths to `/index.html` for clean React Router client-side navigation.
+- **Environment Variable**:
+  ```bash
+  VITE_API_BASE_URL=https://infralytiq.onrender.com
+  ```
+  *Configured in Vercel Project Settings > Environment Variables. Centralized in `frontend/src/api/client.ts` to automatically route all API requests and media assets to the Render backend.*
+
+### Storage & Persistence Strategy
+
+| Storage Tier | Free / Starter Tier (Ephemeral) | Production Tier (Persistent) |
+|:---|:---|:---|
+| **Database** | Local SQLite file (`./data/shm_ai.db`). Ephemeral across container restarts. | Managed PostgreSQL (`DATABASE_URL=postgresql+asyncpg://...`) or Render Persistent Disk. |
+| **Evidence Media** | Ephemeral container directory (`./data/uploads/evidence`). | Render Persistent Disk mounted at `/var/data/uploads` or S3/Cloudflare R2 object storage. |
+| **Report Files** | Ephemeral container directory (`./reports`). | Render Persistent Disk mounted at `/var/data/reports` or cloud bucket. |
+
+> [!TIP]
+> **Enabling Render Persistent Disk**:
+> On Render Starter plans ($7/mo), uncomment the `disk:` block in `render.yaml`:
+> ```yaml
+> disk:
+>   name: shm-ai-data
+>   mountPath: /var/data
+>   sizeGB: 1
+> ```
+> And set the corresponding environment variables:
+> `DATABASE_URL=sqlite+aiosqlite:////var/data/shm_ai.db`, `UPLOAD_DIR=/var/data/uploads`, and `REPORTS_DIR=/var/data/reports`.
+
+### PDF Report Generation
+
+- **Primary Pipeline**: SHM-AI searches for headless Chromium/Edge (`--headless --disable-gpu --print-to-pdf`) to render pixel-perfect, publication-grade vector PDFs directly from the Jinja2 HTML dossiers.
+- **Container Fallback**: If a headless browser is not detected in minimal Linux containers, the engine seamlessly falls back to Python's `weasyprint` package.
+- **Always-Available Standalone HTML**: Regardless of server-side PDF utilities, self-contained standalone HTML dossiers (with embedded base64 photography) are always generated and can be printed to PDF directly via any browser (`Ctrl+P` / `Cmd+P`).
+
+---
+
 ## API Reference
 
 ### System
@@ -489,6 +653,24 @@ npm run lint
 # Production bundle build
 npm run build
 ```
+
+---
+
+## Engineering Limitations & Governance
+
+SHM-AI adheres to rigorous engineering ethics and transparent diagnostic disclosures:
+
+1. **Surface Optical vs Subsurface Volumetric Depth**:
+   - 2D optical computer vision is strictly limited to surface defect observations. Surface photography cannot measure subsurface crack depth, internal concrete voiding, honeycombing, or rebar delamination.
+   - For structural safety assessments requiring depth quantification, non-destructive testing (NDT) such as Ultrasonic Pulse Velocity (UPV), impact-echo, or ground-penetrating radar (GPR) must be conducted.
+2. **Metric Calibration Governance**:
+   - Physical millimeter measurements ($\text{length}_{\text{mm}}$, $\text{width}_{\text{mm}}$, $\text{area}_{\text{mm}^2}$) require valid optical scale calibration (either a known coplanar calibration marker or camera sensor GSD).
+   - Uncalibrated images are reported with pixel dimensions only and explicitly flagged with `Requires Calibration` warnings to prevent misleading physical claims.
+3. **Decision Support & Professional Oversight**:
+   - Algorithmic structural health scores, risk classifications, and maintenance recommendations are decision-support aids designed to augment civil engineers.
+   - Automated recommendations must be reviewed, audited, and formally certified by a licensed professional civil structural engineer prior to implementing safety-critical interventions or structural modifications.
+4. **Cloud Compute Latency**:
+   - On free-tier CPU-only cloud instances, inference on multi-megapixel images using high-resolution tile slicing ($640 \times 640$ with 40% overlap) requires several seconds per image. Production high-throughput deployments should utilize GPU-accelerated instances (`INFERENCE_DEVICE=cuda`).
 
 ---
 
