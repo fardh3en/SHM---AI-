@@ -139,10 +139,15 @@ async def generic_exception_handler(request: Request, exc: Exception) -> JSONRes
         exc_info=True
     )
     
+    detail_msg = (
+        f"Internal server error: {str(exc)}"
+        if settings.DEBUG
+        else "An unexpected internal server error occurred."
+    )
     response = JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content={
-            "detail": "An unexpected internal server error occurred.",
+            "detail": detail_msg,
             "error_code": "INTERNAL_SERVER_ERROR",
         },
     )

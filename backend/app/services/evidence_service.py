@@ -23,7 +23,10 @@ logger = logging.getLogger(__name__)
 ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".tif", ".tiff"}
 ALLOWED_MIME_TYPES = {
     "image/jpeg",
+    "image/jpg",
+    "image/pjpeg",
     "image/png",
+    "image/x-png",
     "image/webp",
     "image/tiff",
     "application/octet-stream",

@@ -26,6 +26,8 @@ from pathlib import Path
 import numpy as np
 
 from backend.app.core.exceptions import InferenceError
+from vision.calibration.image_quality import ImageQualityAnalyzer
+from vision.calibration.schemas import ImageQualityAssessment
 from vision.detectors.base import IDetector, RawDetection
 from vision.pipeline.base import IInferencePipeline
 from vision.postprocessing.measurements import MeasurementService
@@ -88,6 +90,11 @@ class CVInferencePipeline(IInferencePipeline):
         """The active detector instance."""
         return self._detector
 
+    @property
+    def image_quality(self) -> ImageQualityAssessment | None:
+        """Image quality and measurement suitability assessment of last processed image."""
+        return getattr(self, "_image_quality", None)
+
     def run(self, image_path: str | Path) -> list[DetectionResult]:
         """
         Run the full inference pipeline on a single image file.
@@ -104,6 +111,11 @@ class CVInferencePipeline(IInferencePipeline):
             # In slicing mode, keep native resolution for tile generation.
             max_dim = 1280 if not self._slice_if_large else None
             image = ImageLoader.load_image(path, max_dimension=max_dim)
+            self._image_quality = ImageQualityAnalyzer.analyze(
+                image,
+                image_id=path.name,
+                image_format=path.suffix.lstrip(".").upper(),
+            )
         except FileNotFoundError as exc:
             raise InferenceError(f"Image file not found: {path}") from exc
         except ValueError as exc:
@@ -274,14 +286,52 @@ class CVInferencePipeline(IInferencePipeline):
             bbox_h_px = (bbox_norm[3] - bbox_norm[1]) * img_height
             area_px = max(0.0, bbox_w_px) * max(0.0, bbox_h_px)
 
+        vertical_extent_px = max(0.0, (bbox_norm[3] - bbox_norm[1]) * img_height)
+        is_calibrated = (
+            self._measurement_service.pixel_to_mm_ratio is not None
+            and self._measurement_service.pixel_to_mm_ratio > 0
+        )
+        unavail_reasons: list[str] = []
+        if not is_calibrated:
+            unavail_reasons.append(
+                "Image is uncalibrated. Physical measurements in millimeters are withheld until a valid reference scale "
+                "or Ground Sampling Distance (GSD) is provided."
+            )
+        unavail_reasons.append(
+            "Subsurface crack depth cannot be measured from 2D optical surface photography. "
+            "Non-destructive testing (such as ultrasonic pulse velocity) is required."
+        )
+
         final_measurement = MeasurementResult.create_calibrated(
             area_px=area_px,
             length_px=length_px,
             width_px=width_px,
             max_width_px=max_width_px,
+            vertical_extent_px=round(vertical_extent_px, 1),
             orientation_deg=orientation_deg,
             pixel_to_mm_ratio=self._measurement_service.pixel_to_mm_ratio,
+            calibration_status="calibrated" if is_calibrated else "uncalibrated",
+            measurement_status="measured" if is_calibrated else "requires_calibration",
+            unavailability_reasons=unavail_reasons,
         )
+
+        # Attach structured properties to mask_polygon for persistence & serialization
+        if mask_polygon is not None and isinstance(mask_polygon, dict):
+            mask_polygon["properties"] = {
+                "vertical_extent_px": round(vertical_extent_px, 1),
+                "max_width_px": round(max_width_px, 2) if max_width_px is not None else None,
+                "length_mm": round(final_measurement.length_mm, 2) if final_measurement.length_mm is not None else None,
+                "width_mm": round(final_measurement.width_mm, 2) if final_measurement.width_mm is not None else None,
+                "max_width_mm": round(final_measurement.max_width_mm, 2) if final_measurement.max_width_mm is not None else None,
+                "area_mm2": round(final_measurement.area_mm2, 1) if final_measurement.area_mm2 is not None else None,
+                "depth_status": "not_measured",
+                "depth_mm": None,
+                "calibration_status": "calibrated" if is_calibrated else "uncalibrated",
+                "measurement_status": "measured" if is_calibrated else "requires_calibration",
+                "unavailability_reasons": unavail_reasons,
+            }
+
+        quality_dict = self.image_quality.model_dump() if self.image_quality else None
 
         return DetectionResult(
             defect_type=raw.defect_type,
@@ -294,4 +344,12 @@ class CVInferencePipeline(IInferencePipeline):
             tile_y=tile_y,
             measurements=final_measurement,
             mask_polygon=mask_polygon,
+            image_width=img_width,
+            image_height=img_height,
+            model_name=getattr(self._detector, "model_name", None),
+            class_id=raw.class_id,
+            vertical_extent_px=round(vertical_extent_px, 1),
+            depth_status="not_measured",
+            depth_mm=None,
+            quality_assessment=quality_dict,
         )

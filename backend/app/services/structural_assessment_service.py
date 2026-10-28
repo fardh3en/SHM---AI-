@@ -356,6 +356,7 @@ class StructuralAssessmentService(BaseService):
         ]
 
         metadata_dict: dict[str, Any] = {
+            "model_name": model_name,
             "data_sources": STANDARD_DATA_SOURCES,
             "assumptions": STANDARD_ASSUMPTIONS,
             "limitations": STANDARD_LIMITATIONS,

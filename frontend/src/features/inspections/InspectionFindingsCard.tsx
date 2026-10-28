@@ -189,7 +189,7 @@ export default function InspectionFindingsCard({
         <div className={styles.metricCard}>
           <span className={styles.metricLabel}>Latency</span>
           <div className={styles.metricValue}>
-            {inspection.processing_time_ms !== null ? inspection.processing_time_ms : '—'}
+            {inspection.processing_time_ms !== null ? Math.round(inspection.processing_time_ms) : '—'}
             {inspection.processing_time_ms !== null && (
               <span className={styles.metricUnit}>ms</span>
             )}
@@ -383,11 +383,18 @@ export default function InspectionFindingsCard({
           </Button>
 
           {isCompleted && (
-            <Link to={`/vision?inspectionId=${inspection.id}`} style={{ textDecoration: 'none' }}>
-              <Button variant="secondary">
-                <ScanLine size={16} /> Open in Vision Studio
-              </Button>
-            </Link>
+            <>
+              <Link to={`/vision?inspectionId=${inspection.id}`} style={{ textDecoration: 'none' }}>
+                <Button variant="secondary">
+                  <ScanLine size={16} /> Open in Vision Studio
+                </Button>
+              </Link>
+              <Link to={`/reports?assetId=${asset.id}&inspectionId=${inspection.id}`} style={{ textDecoration: 'none' }}>
+                <Button variant="secondary">
+                  <FileText size={16} /> Engineering Report
+                </Button>
+              </Link>
+            </>
           )}
 
           {onReassignAsset && availableAssets.length > 0 && (

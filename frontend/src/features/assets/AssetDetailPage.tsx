@@ -5,7 +5,6 @@ import {
   Activity,
   FileText,
   Layers,
-  Box,
   ScanLine,
   Camera,
 } from 'lucide-react'
@@ -91,9 +90,9 @@ export default function AssetDetailPage() {
             <ArrowLeft size={15} />
             <span>Return to Asset Registry</span>
           </Link>
-          <Link to={`/structural-health?assetId=${asset.id}`} className={styles.backLink}>
-            <Box size={15} />
-            <span>Interactive 3D Structural Health</span>
+          <Link to={`/vision?assetId=${asset.id}`} className={styles.backLink}>
+            <ScanLine size={15} />
+            <span>View Vision Studio Telemetry</span>
           </Link>
         </div>
 

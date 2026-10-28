@@ -89,7 +89,7 @@ export default function Dashboard() {
         <aside className={styles.notice} role="note">
           <span className={styles.noticeLabel}>SHM-AI Engineering Platform</span>
           <p className={styles.noticeText}>
-            Asset Registry, Photo-First Inspection Studio, 3D Structural Health, and Engineering Reports are active.
+            Asset Registry, Photo-First Inspection Studio, Autonomous Vision Analysis, and Engineering Reports are active.
             Autonomous Vision Analysis and Decision Engines process telemetry with full audit traceability.
           </p>
         </aside>

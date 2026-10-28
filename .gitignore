@@ -45,6 +45,12 @@ weights/*.pt
 weights/*.pth
 weights/*.onnx
 !weights/.gitkeep
+runs/
+
+# ── Datasets (raw images, annotations, zip archives) ──────────────────────────
+datasets/*
+!datasets/.gitkeep
+*.zip
 
 # ── Reports & uploads ─────────────────────────────────────────────────────────
 reports/*.pdf

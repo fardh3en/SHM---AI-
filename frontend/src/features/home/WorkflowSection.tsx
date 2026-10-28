@@ -28,8 +28,8 @@ const STEPS: Step[] = [
   },
   {
     number: '04',
-    title: '3D Spatial Mapping',
-    description: 'Interactive parametric structural twin maps localized findings directly to members.',
+    title: 'Defect Mapping & Cataloging',
+    description: 'Evidence ledger and localized defect mapping associate findings directly with asset components.',
     color: 'lilac',
   },
   {

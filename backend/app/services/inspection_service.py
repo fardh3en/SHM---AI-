@@ -91,6 +91,7 @@ class InspectionService(BaseService):
         return await self._repo.get_all(
             page=page,
             page_size=page_size,
+            order_by=(Inspection.created_at.desc(), Inspection.id.desc()),
         )
 
     async def list_inspections_for_asset(self, asset_id: str) -> list[Inspection]:

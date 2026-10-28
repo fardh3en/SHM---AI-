@@ -31,11 +31,11 @@ const CAPABILITIES: Capability[] = [
       'Engineering rules engine computes composite health scores from defect severity, density, and crack characteristics. Risk levels: Low, Moderate, High, Critical.',
   },
   {
-    title: '3D Structural Health',
-    metric: 'Spatial Twin',
-    metricLabel: 'interactive telemetry',
+    title: 'Defect Localization & Mapping',
+    metric: '2D Inspection',
+    metricLabel: 'visual telemetry',
     description:
-      'Parametric 3D structural models map localized inspection findings, defect severity, and photographic evidence directly to individual structural members.',
+      'High-precision visual mapping records localized inspection findings, defect severity, and photographic evidence directly to asset components.',
   },
   {
     title: 'Maintenance Recommendations',

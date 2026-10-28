@@ -35,10 +35,15 @@ def _build_engine_kwargs() -> dict[str, Any]:
     kwargs: dict[str, Any] = {"echo": settings.DATABASE_ECHO}
 
     if "sqlite" in url:
-        # aiosqlite requires StaticPool for correct async behaviour.
-        # check_same_thread must be False when sharing across coroutines.
-        kwargs["connect_args"] = {"check_same_thread": False}
-        kwargs["poolclass"] = StaticPool
+        # In-memory SQLite requires StaticPool so tables survive across sessions.
+        # File-based SQLite uses NullPool so each session has an independent connection,
+        # preventing "cannot commit transaction - SQL statements in progress" on concurrent requests.
+        kwargs["connect_args"] = {"check_same_thread": False, "timeout": 30.0}
+        if ":memory:" in url:
+            kwargs["poolclass"] = StaticPool
+        else:
+            from sqlalchemy.pool import NullPool
+            kwargs["poolclass"] = NullPool
     else:
         # PostgreSQL / production — use connection pool with health checks.
         kwargs["pool_pre_ping"] = True
@@ -51,6 +56,19 @@ def _build_engine_kwargs() -> dict[str, Any]:
 
 # ── Engine (module-level singleton) ───────────────────────────────────────────
 engine = create_async_engine(settings.DATABASE_URL, **_build_engine_kwargs())
+
+if "sqlite" in settings.DATABASE_URL:
+    from sqlalchemy import event
+
+    @event.listens_for(engine.sync_engine, "connect")
+    def _set_sqlite_pragma(dbapi_connection: Any, connection_record: Any) -> None:
+        try:
+            cursor = dbapi_connection.cursor()
+            cursor.execute("PRAGMA journal_mode=WAL")
+            cursor.execute("PRAGMA busy_timeout=30000")
+            cursor.close()
+        except Exception:
+            pass
 
 # ── Session factory ───────────────────────────────────────────────────────────
 AsyncSessionFactory = async_sessionmaker(

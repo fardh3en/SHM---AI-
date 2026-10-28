@@ -24,6 +24,7 @@ export default function ReportsPage() {
   const [searchParams] = useSearchParams()
   const urlAssetId = searchParams.get('assetId')
   const urlInspId = searchParams.get('inspectionId')
+  const urlReportFile = searchParams.get('reportFile')
 
   const { data: assetsData, isLoading: assetsLoading, isError: assetsError } = useAssets(1, 100)
   const assets = useMemo(() => assetsData?.items ?? [], [assetsData])
@@ -73,7 +74,14 @@ export default function ReportsPage() {
   // Generate mutation
   const generateMutation = useGenerateReport()
   const [activeReport, setActiveReport] = useState<ReportGenerateResponse | null>(null)
+  const [selectedReportFile, setSelectedReportFile] = useState<string | null>(null)
   const iframeRef = useRef<HTMLIFrameElement>(null)
+
+  useEffect(() => {
+    if (urlReportFile) {
+      setSelectedReportFile(urlReportFile)
+    }
+  }, [urlReportFile])
 
   const handleCompileReport = () => {
     if (!selectedAsset || !selectedInspection) return
@@ -86,6 +94,7 @@ export default function ReportsPage() {
       {
         onSuccess: (data) => {
           setActiveReport(data)
+          setSelectedReportFile(data.filename)
           void refetchArchive()
         },
       }
@@ -97,6 +106,8 @@ export default function ReportsPage() {
       iframeRef.current.contentWindow.print()
     }
   }
+
+  const currentPreviewFilename = activeReport?.filename || selectedReportFile
 
   if (assetsLoading) {
     return (
@@ -141,7 +152,7 @@ export default function ReportsPage() {
         {/* Report Compilation Form Panel */}
         <section className={styles.generatorPanel} aria-label="Compile Report">
           <h2 className={styles.panelHeading}>
-            <FileText size={18} color="#D8C65A" />
+            <FileText size={18} color="#353B32" />
             <span>Compile New Engineering Report</span>
           </h2>
 
@@ -196,7 +207,7 @@ export default function ReportsPage() {
                   })}
                 </select>
               ) : (
-                <div style={{ padding: '8px', fontSize: '12px', color: '#E0564A', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <div style={{ padding: '8px', fontSize: '12px', color: '#9D3E32', display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <AlertCircle size={14} />
                   <span>No completed inspections found for this asset.</span>
                 </div>
@@ -227,28 +238,32 @@ export default function ReportsPage() {
           </div>
 
           {generateMutation.isError && (
-            <div style={{ color: '#E0564A', fontSize: '12px', marginTop: '8px' }}>
+            <div style={{ color: '#9D3E32', fontSize: '12px', marginTop: '8px' }}>
               Error: {generateMutation.error.message || 'Report assembly failed.'}
             </div>
           )}
         </section>
 
         {/* Live Report Preview Frame */}
-        {activeReport && (
+        {currentPreviewFilename && (
           <section className={styles.previewSection} aria-label="Report Preview">
             <div className={styles.previewHeader}>
               <div className={styles.previewMeta}>
-                <CheckCircle2 size={16} color="#3D6B4A" />
+                <CheckCircle2 size={16} color="#66765A" />
                 <span>
-                  Compiled Report: <strong>{activeReport.filename}</strong>
+                  Report Dossier: <strong>{currentPreviewFilename}</strong>
                 </span>
-                <span>• Health: {activeReport.health_score ?? '—'}/100</span>
-                <span>• Action: {activeReport.recommended_action.toUpperCase()}</span>
+                {activeReport?.health_score !== undefined && (
+                  <span>• Health: {activeReport.health_score ?? '—'}/100</span>
+                )}
+                {activeReport?.recommended_action && (
+                  <span>• Action: {activeReport.recommended_action.toUpperCase()}</span>
+                )}
               </div>
 
               <div className={styles.previewActions}>
                 <a
-                  href={`/api/v1/reports/${activeReport.filename}`}
+                  href={`/api/v1/reports/${currentPreviewFilename}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className={styles.previewBtn}
@@ -269,8 +284,8 @@ export default function ReportsPage() {
                 </button>
 
                 <a
-                  href={`/api/v1/reports/${activeReport.filename}`}
-                  download={activeReport.filename}
+                  href={`/api/v1/reports/${currentPreviewFilename}`}
+                  download={currentPreviewFilename}
                   className={styles.previewBtn}
                   title="Download HTML report file"
                 >
@@ -283,7 +298,8 @@ export default function ReportsPage() {
             <div className={styles.iframeWrapper}>
               <iframe
                 ref={iframeRef}
-                srcDoc={activeReport.html_content}
+                src={activeReport ? undefined : `/api/v1/reports/${currentPreviewFilename}`}
+                srcDoc={activeReport ? activeReport.html_content : undefined}
                 title="Compiled Engineering Report Preview"
                 className={styles.reportIframe}
               />
@@ -294,7 +310,7 @@ export default function ReportsPage() {
         {/* Persisted Reports Archive */}
         <section className={styles.archiveSection} aria-label="Persisted Reports Archive">
           <h3 className={styles.panelHeading}>
-            <Archive size={16} color="#B6BDA8" />
+            <Archive size={16} color="#77766D" />
             <span>Persisted Report Archive ({archivedReports.length})</span>
           </h3>
 
@@ -359,15 +375,31 @@ export default function ReportsPage() {
                           </span>
                         </td>
                         <td>
-                          <a
-                            href={`/api/v1/reports/${r.filename}`}
-                            download={r.filename}
-                            className={styles.reportLink}
-                            title="Download file"
-                          >
-                            <Download size={13} />
-                            <span>Download</span>
-                          </a>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedReportFile(r.filename)
+                                setActiveReport(null)
+                                window.scrollTo({ top: 380, behavior: 'smooth' })
+                              }}
+                              className={styles.reportLink}
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                              title="Preview report in frame above"
+                            >
+                              <ExternalLink size={13} />
+                              <span>Preview</span>
+                            </button>
+                            <a
+                              href={`/api/v1/reports/${r.filename}`}
+                              download={r.filename}
+                              className={styles.reportLink}
+                              title="Download file"
+                            >
+                              <Download size={13} />
+                              <span>Download</span>
+                            </a>
+                          </div>
                         </td>
                       </tr>
                     )

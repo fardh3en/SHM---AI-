@@ -25,6 +25,8 @@ class RawDetection(BaseModel):
     # Binary mask of the target instance (same width and height as input image/tile)
     # Stored as numpy array for efficiency during post-processing
     mask: np.ndarray | None = Field(default=None, description="Binary instance mask.")
+    class_id: int | None = Field(default=None, description="Model raw class index.")
+    class_name: str | None = Field(default=None, description="Model raw class label string.")
 
     model_config = {
         "arbitrary_types_allowed": True

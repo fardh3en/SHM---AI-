@@ -6,7 +6,7 @@ Each detection has a type, confidence score, bounding box, optional mask polygon
 and computed measurements (area, length, width, orientation).
 
 Measurements are in pixel coordinates during Phase 2. Real-world unit conversion
-(requiring camera calibration data) is planned for Phase 3.
+(requiring camera calibration data) is supported via calibration metadata.
 """
 from __future__ import annotations
 
@@ -113,6 +113,81 @@ class Detection(UUIDPrimaryKeyMixin, TimestampedMixin, Base):
     inspection: Mapped[Inspection] = relationship(
         "Inspection", back_populates="detections"
     )
+
+    # ── Calibration & Advanced Measurement Properties (stored in mask_polygon) ─
+    @property
+    def properties(self) -> dict[str, Any]:
+        if isinstance(self.mask_polygon, dict):
+            return self.mask_polygon.get("properties") or {}
+        return {}
+
+    @property
+    def vertical_extent_px(self) -> float | None:
+        val = self.properties.get("vertical_extent_px")
+        if val is not None:
+            return float(val)
+        return None
+
+    @property
+    def max_width_px(self) -> float | None:
+        val = self.properties.get("max_width_px")
+        if val is not None:
+            return float(val)
+        return None
+
+    @property
+    def length_mm(self) -> float | None:
+        val = self.properties.get("length_mm")
+        if val is not None:
+            return float(val)
+        return None
+
+    @property
+    def width_mm(self) -> float | None:
+        val = self.properties.get("width_mm")
+        if val is not None:
+            return float(val)
+        return None
+
+    @property
+    def max_width_mm(self) -> float | None:
+        val = self.properties.get("max_width_mm")
+        if val is not None:
+            return float(val)
+        return None
+
+    @property
+    def area_mm2(self) -> float | None:
+        val = self.properties.get("area_mm2")
+        if val is not None:
+            return float(val)
+        return None
+
+    @property
+    def depth_status(self) -> str:
+        return str(self.properties.get("depth_status", "not_measured"))
+
+    @property
+    def depth_mm(self) -> float | None:
+        val = self.properties.get("depth_mm")
+        if val is not None:
+            return float(val)
+        return None
+
+    @property
+    def calibration_status(self) -> str:
+        return str(self.properties.get("calibration_status", "uncalibrated"))
+
+    @property
+    def measurement_status(self) -> str:
+        return str(self.properties.get("measurement_status", "requires_calibration"))
+
+    @property
+    def unavailability_reasons(self) -> list[str]:
+        reasons = self.properties.get("unavailability_reasons")
+        if isinstance(reasons, list):
+            return [str(r) for r in reasons]
+        return []
 
     def __repr__(self) -> str:
         return (

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef } from 'react'
 import {
   UploadCloud,
   Trash2,
@@ -13,6 +13,7 @@ import {
 import type { InspectionSource } from '../../api/inspections'
 import { useAssetEvidence } from '../../hooks/useAssetEvidence'
 import type { AssetEvidence } from '../../api/evidence'
+import { resolveMediaUrl } from '../../api/client'
 import styles from './EvidenceUploader.module.css'
 
 export interface SelectedMediaFile {
@@ -84,15 +85,6 @@ export default function EvidenceUploader({
   // Fetch asset archived visual evidence if assetId is set
   const { data: archivedEvidence, isLoading: isEvidenceLoading } = useAssetEvidence(assetId)
 
-  // Revoke object URL on unmount if it was created locally
-  useEffect(() => {
-    return () => {
-      if (mediaFile?.file && mediaFile.previewUrl.startsWith('blob:')) {
-        URL.revokeObjectURL(mediaFile.previewUrl)
-      }
-    }
-  }, [mediaFile])
-
   // Select an archived evidence image
   const handleSelectArchived = (ev: AssetEvidence) => {
     onSelectMediaFile({
@@ -111,6 +103,10 @@ export default function EvidenceUploader({
   // Handle local file validation & staging
   const handleFile = (file: File) => {
     setValidationError(null)
+
+    if (mediaFile?.file && mediaFile.previewUrl.startsWith('blob:')) {
+      URL.revokeObjectURL(mediaFile.previewUrl)
+    }
 
     if (!ACCEPTED_TYPES.includes(file.type)) {
       setValidationError(
@@ -385,7 +381,7 @@ export default function EvidenceUploader({
                       >
                         <div className={styles.archiveThumbWrap}>
                           <img
-                            src={ev.file_path}
+                            src={resolveMediaUrl(ev.file_path)}
                             alt={ev.caption}
                             className={styles.archiveThumb}
                             loading="lazy"

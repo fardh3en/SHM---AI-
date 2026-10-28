@@ -410,7 +410,7 @@ export default function XRayBuildingViewer() {
       ref={containerRef}
       className={styles.viewerContainer}
       role="region"
-      aria-label="SHM-AI Interactive 3D X-Ray Building Digital Twin"
+      aria-label="SHM-AI Interactive 3D X-Ray Building Digital Twin (Demonstration)"
     >
       {/* 3D Canvas Mount */}
       <div ref={canvasMountRef} className={styles.canvasStage} />
@@ -550,11 +550,11 @@ export default function XRayBuildingViewer() {
       {/* ── Floating Diagnostic Card: Column C-03 (Reference 1) ─────────────── */}
       <aside
         className={styles.diagnosticCard}
-        aria-label={`Structural diagnostic for ${selectedMember.name}`}
+        aria-label={`Demonstration structural diagnostic for ${selectedMember.name}`}
       >
         <div className={styles.cardHeader}>
           <div className={styles.cardTitleBlock}>
-            <span className={styles.cardIdTag}>{COLUMN_C03_DEFECT.crackId}</span>
+            <span className={styles.cardIdTag}>DEMO · {COLUMN_C03_DEFECT.crackId}</span>
             <span className={styles.cardTitle}>{selectedMember.name}</span>
           </div>
           <Link
@@ -600,14 +600,14 @@ export default function XRayBuildingViewer() {
             </div>
             <div className={styles.metricRow}>
               <span className={styles.metricName}>Confidence</span>
-              <span className={styles.metricVal}>94% (UPV)</span>
+              <span className={styles.metricVal}>Simulated (UPV)</span>
             </div>
           </div>
         </div>
 
         {/* Engineering Directive Banner */}
         <div className={styles.cardDirectiveBox}>
-          <strong>NDT Directive:</strong> Carbonation ingress 22mm. Apply epoxy-resin micro-injection within 30 days.
+          <strong>Demonstration Model:</strong> Illustrative structural defect simulation. Field engineering verification requires calibrated physical NDT telemetry.
         </div>
       </aside>
 

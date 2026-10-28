@@ -11,6 +11,7 @@ Design:
 - Pagination is built-in — returns (items, total_count) tuples
 - No business logic here — pure data access only
 """
+import logging
 import uuid
 from collections.abc import Sequence
 from typing import Any, Generic, TypeVar
@@ -21,6 +22,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.app.models.base import Base
 
 ModelT = TypeVar("ModelT", bound=Base)
+
+logger = logging.getLogger(__name__)
 
 
 class BaseRepository(Generic[ModelT]):
@@ -74,7 +77,10 @@ class BaseRepository(Generic[ModelT]):
                 count_query = count_query.where(condition)
 
         if order_by is not None:
-            base_query = base_query.order_by(order_by)
+            if isinstance(order_by, (tuple, list)):
+                base_query = base_query.order_by(*order_by)
+            else:
+                base_query = base_query.order_by(order_by)
 
         total: int = (await self.session.execute(count_query)).scalar_one()
 
@@ -95,7 +101,10 @@ class BaseRepository(Generic[ModelT]):
         instance = self.model(**kwargs)
         self.session.add(instance)
         await self.session.flush()        # assigns DB-generated defaults
-        await self.session.refresh(instance)  # re-load from DB
+        try:
+            await self.session.refresh(instance)  # re-load from DB
+        except Exception as exc:
+            logger.warning("Could not refresh instance %r: %s", instance, exc)
         return instance
 
     async def update(self, entity: ModelT, **kwargs: Any) -> ModelT:
@@ -110,7 +119,10 @@ class BaseRepository(Generic[ModelT]):
                 setattr(entity, key, value)
         self.session.add(entity)
         await self.session.flush()
-        await self.session.refresh(entity)
+        try:
+            await self.session.refresh(entity)
+        except Exception as exc:
+            logger.warning("Could not refresh entity %r: %s", entity, exc)
         return entity
 
     async def update_fields(self, entity: ModelT, **kwargs: Any) -> ModelT:
@@ -122,7 +134,10 @@ class BaseRepository(Generic[ModelT]):
                 setattr(entity, key, value)
         self.session.add(entity)
         await self.session.flush()
-        await self.session.refresh(entity)
+        try:
+            await self.session.refresh(entity)
+        except Exception as exc:
+            logger.warning("Could not refresh entity %r: %s", entity, exc)
         return entity
 
     async def delete(self, entity: ModelT) -> None:

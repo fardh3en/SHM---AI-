@@ -1,8 +1,10 @@
 """
 Asset evidence API endpoints.
 """
+import logging
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile, status
 
+from backend.app.config import get_settings
 from backend.app.core.exceptions import SHMBaseException
 from backend.app.dependencies import EvidenceServiceDep
 from backend.app.models.asset_evidence import EvidenceClassification
@@ -11,6 +13,9 @@ from backend.app.schemas.asset_evidence import (
     AssetEvidenceResponse,
     EvidenceUploadResponse,
 )
+
+logger = logging.getLogger(__name__)
+settings = get_settings()
 
 router = APIRouter(tags=["Evidence"])
 
@@ -49,6 +54,10 @@ async def upload_evidence(
         )
     except SHMBaseException as exc:
         raise HTTPException(status_code=exc.http_status, detail=exc.message) from exc
+    except Exception as exc:
+        logger.exception(f"Unexpected error in evidence upload: {exc}")
+        detail_msg = f"Evidence upload failed: {str(exc)}" if settings.DEBUG else "Failed to persist evidence image."
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=detail_msg) from exc
 
     return EvidenceUploadResponse(
         id=record.id if record else None,
@@ -98,6 +107,10 @@ async def upload_asset_evidence(
         )
     except SHMBaseException as exc:
         raise HTTPException(status_code=exc.http_status, detail=exc.message) from exc
+    except Exception as exc:
+        logger.exception(f"Unexpected error in evidence upload: {exc}")
+        detail_msg = f"Evidence upload failed: {str(exc)}" if settings.DEBUG else "Failed to persist evidence image."
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=detail_msg) from exc
 
     return EvidenceUploadResponse(
         id=record.id if record else None,

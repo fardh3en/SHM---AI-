@@ -4,7 +4,6 @@ import Dashboard from './features/dashboard/Dashboard'
 import AssetListPage from './features/assets/AssetListPage'
 import AssetDetailPage from './features/assets/AssetDetailPage'
 import InspectionStudioPage from './features/inspections/InspectionStudioPage'
-import StructuralHealthPage from './features/visualization/StructuralHealthPage'
 import VisionAnalysisPage from './features/vision/VisionAnalysisPage'
 import ReportsPage from './features/reports/ReportsPage'
 import AppShell from './components/layout/AppShell'
@@ -21,9 +20,10 @@ export default function App() {
         <Route path="/assets" element={<AssetListPage />} />
         <Route path="/assets/:id" element={<AssetDetailPage />} />
         <Route path="/inspections" element={<InspectionStudioPage />} />
-        <Route path="/structural-health" element={<StructuralHealthPage />} />
         <Route path="/vision" element={<VisionAnalysisPage />} />
         <Route path="/reports" element={<ReportsPage />} />
+        {/* Legacy redirect for removed 3D route */}
+        <Route path="/structural-health" element={<Navigate to="/vision" replace />} />
       </Route>
 
       {/* Catch-all redirect */}

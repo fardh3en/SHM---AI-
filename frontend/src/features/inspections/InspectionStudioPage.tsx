@@ -10,6 +10,7 @@ import {
   Loader2,
   ScanLine,
   PlusCircle,
+  Info,
 } from 'lucide-react'
 import PageHeader from '../../components/layout/PageHeader'
 import Button from '../../components/ui/Button'
@@ -24,10 +25,12 @@ import {
   useCreateInspection,
   useUpdateInspection,
   useRunInspection,
+  useInspection,
 } from '../../hooks/useInspections'
 import type { Asset, AssetType } from '../../api/assets'
 import type { Inspection, InspectionSource } from '../../api/inspections'
 import { evidenceApi } from '../../api/evidence'
+import { ApiError, resolveMediaUrl } from '../../api/client'
 import styles from './InspectionStudioPage.module.css'
 
 type Step = 1 | 2 | 3 | 4
@@ -45,10 +48,11 @@ function formatDate(iso: string): string {
 }
 
 export default function InspectionStudioPage() {
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const location = useLocation()
   const initialAssetId = searchParams.get('asset_id')
   const initialEvidencePath = searchParams.get('evidence_path')
+  const initialInspectionId = searchParams.get('inspection_id') || searchParams.get('inspectionId')
 
   // Step state — defaults to Step 1: Upload Crack Photograph (Photo-First)
   const [step, setStep] = useState<Step>(1)
@@ -75,6 +79,7 @@ export default function InspectionStudioPage() {
   const runMutation = useRunInspection()
 
   // Queries
+  const { data: existingInspection } = useInspection(initialInspectionId ?? undefined)
   const { data: preloadedAsset } = useAsset(initialAssetId ?? undefined)
   const { data: allAssetsData } = useAssets(1, 100)
   const assetsList = allAssetsData?.items ?? []
@@ -82,6 +87,38 @@ export default function InspectionStudioPage() {
   const { data: assetInspections, isLoading: inspectionsLoading } = useAssetInspections(
     selectedAsset?.id
   )
+
+  // Handle continuing an existing inspection with persisted evidence
+  useEffect(() => {
+    if (existingInspection) {
+      if (existingInspection.input_path && !mediaFile) {
+        setMediaFile({
+          previewUrl: resolveMediaUrl(existingInspection.input_path),
+          formattedSize: 'Persisted Evidence',
+          isSampleEvidence: true,
+          caption: existingInspection.input_path.split('/').pop() || 'Existing Evidence',
+        })
+      }
+      if (existingInspection.status === 'completed') {
+        setCompletedInspection(existingInspection)
+        setStep(4)
+      } else {
+        setRetryInspectionId(existingInspection.id)
+        setStep(3)
+      }
+    }
+  }, [existingInspection])
+
+  // If existing inspection loaded and asset not yet set, match it
+  useEffect(() => {
+    if (existingInspection && !selectedAsset && assetsList.length > 0) {
+      const match = assetsList.find((a) => a.id === existingInspection.asset_id)
+      if (match) {
+        setSelectedAsset(match)
+        setStructureMode('existing')
+      }
+    }
+  }, [existingInspection, selectedAsset, assetsList])
 
   // Check for preloaded file passed via router location state (e.g. from Dashboard drop)
   useEffect(() => {
@@ -196,7 +233,12 @@ export default function InspectionStudioPage() {
             )
             inputPath = uploadRes.file_path
           } catch (uploadErr: unknown) {
-            const msg = uploadErr instanceof Error ? uploadErr.message : 'Upload failed'
+            let msg = 'Upload failed'
+            if (uploadErr instanceof ApiError) {
+              msg = uploadErr.detail || `Server error (HTTP ${uploadErr.status})`
+            } else if (uploadErr instanceof Error) {
+              msg = uploadErr.message
+            }
             throw new Error(`Evidence image upload failed: ${msg}`)
           } finally {
             setIsUploading(false)
@@ -295,6 +337,9 @@ export default function InspectionStudioPage() {
 
   // Reset entire studio workflow
   const handleResetWorkflow = () => {
+    if (mediaFile?.file && mediaFile.previewUrl.startsWith('blob:')) {
+      URL.revokeObjectURL(mediaFile.previewUrl)
+    }
     setStep(1)
     setNotes('')
     setSelectedTags([])
@@ -302,6 +347,12 @@ export default function InspectionStudioPage() {
     setCompletedInspection(null)
     setSubmissionError(null)
     setRetryInspectionId(null)
+  }
+
+  // Explicitly start a fresh inspection without query parameters
+  const handleStartNewInspection = () => {
+    handleResetWorkflow()
+    setSearchParams({}, { replace: true })
   }
 
   return (
@@ -316,6 +367,26 @@ export default function InspectionStudioPage() {
       />
 
       <main className={styles.content}>
+        {/* ── Banner when continuing an existing inspection ── */}
+        {initialInspectionId && existingInspection && (
+          <div className={styles.continuingInspectionBanner}>
+            <div className={styles.continuingInfo}>
+              <Info size={16} color="var(--color-mineral)" />
+              <span>
+                Continuing Inspection <strong>{existingInspection.id.slice(0, 8)}</strong>
+                {selectedAsset ? ` (${selectedAsset.name})` : ''} · Existing photographic evidence is loaded.
+              </span>
+            </div>
+            <button
+              type="button"
+              className={styles.newInspectionBtn}
+              onClick={handleStartNewInspection}
+            >
+              <PlusCircle size={14} />
+              <span>Start New Inspection</span>
+            </button>
+          </div>
+        )}
         {/* ── Stepper Header ── */}
         <nav className={styles.stepper} aria-label="Inspection Workflow Steps">
           <button

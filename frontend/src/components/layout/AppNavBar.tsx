@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom'
-import { LayoutDashboard, Layers, ClipboardList, ScanLine, Box, FileText, Info } from 'lucide-react'
+import { LayoutDashboard, Layers, ClipboardList, ScanLine, FileText, Info } from 'lucide-react'
 import { useSystemHealth } from '../../hooks/useSystemHealth'
 import styles from './AppNavBar.module.css'
 
@@ -15,7 +15,6 @@ const NAV_LINKS: NavLinkItem[] = [
   { to: '/assets',            label: 'Assets',     icon: Layers },
   { to: '/inspections',       label: 'Inspections',icon: ClipboardList },
   { to: '/vision',            label: 'Vision',     icon: ScanLine },
-  { to: '/structural-health', label: '3D Health',  icon: Box },
   { to: '/reports',           label: 'Reports',    icon: FileText },
 ]
 

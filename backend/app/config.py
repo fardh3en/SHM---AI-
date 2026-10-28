@@ -98,10 +98,35 @@ class Settings(BaseSettings):
     UPLOAD_DIR: Path = _PROJECT_ROOT / "data" / "uploads"
 
     # ── Vision Engine (Phase 2) ────────────────────────────────────────────────
+    MODEL_ALIASES: dict[str, str] = {
+        "yolo26n-crack-seg": "shm_ai_yolo26n_seg_15e_best.pt",
+        "yolo26n-crack-seg.pt": "shm_ai_yolo26n_seg_15e_best.pt",
+        "yolo26n-seg": "shm_ai_yolo26n_seg_15e_best.pt",
+        "yolo26n-seg.pt": "shm_ai_yolo26n_seg_15e_best.pt",
+        "crack_yolo26n": "shm_ai_yolo26n_seg_15e_best.pt",
+        "crack_seg_26n": "shm_ai_yolo26n_seg_15e_best.pt",
+        "shm_ai_yolo26n_seg_15e_best.pt": "shm_ai_yolo26n_seg_15e_best.pt",
+        "yolo11n-crack-seg": "shm_ai_crack_seg_finetune_15e_best.pt",
+        "yolo11n-crack-seg.pt": "shm_ai_crack_seg_finetune_15e_best.pt",
+        "crack_seg_15e": "shm_ai_crack_seg_finetune_15e_best.pt",
+        "crack_yolov8n_concrete": "crack_yolov8n_concrete.pt",
+        "crack_yolov8n_concrete.pt": "crack_yolov8n_concrete.pt",
+        "yolo11n-seg": "yolo11n-seg.pt",
+        "yolo11n-seg.pt": "yolo11n-seg.pt",
+    }
+    MODEL_PATH: Path | None = Field(
+        default=None,
+        description=(
+            "Explicit path to a YOLO model weight file (.pt). "
+            "If set, takes highest precedence over DEFAULT_MODEL_NAME. "
+            "May be an absolute path or project-relative path."
+        ),
+    )
     DEFAULT_MODEL_NAME: str = Field(
         default="yolo11n-seg.pt",
         description=(
-            "YOLO model filename inside WEIGHTS_DIR. "
+            "YOLO model filename or alias inside WEIGHTS_DIR. "
+            "Supported aliases: 'yolo26n-crack-seg', 'yolo11n-crack-seg', 'crack_yolov8n_concrete', 'yolo11n-seg'. "
             "Ultralytics will auto-download pretrained weights if not found. "
             "Replace with your fine-tuned crack-detection model when available."
         ),
@@ -122,11 +147,11 @@ class Settings(BaseSettings):
     SLICE_WIDTH: int = Field(default=640, ge=64)
     SLICE_OVERLAP_RATIO: float = Field(default=0.4, ge=0.0, lt=1.0)
     SLICE_IF_LARGE: bool = Field(
-        default=False,
+        default=True,
         description=(
-            "Whether to slice images into overlapping tiles. Defaults to False for "
-            "responsive cloud CPU inference (single forward pass); set to True for "
-            "ultra-high-resolution orthomosaic analysis."
+            "Whether to slice images into overlapping tiles. Defaults to True so "
+            "high-resolution field inspection photos preserve native resolution "
+            "and detect fine cracks accurately."
         ),
     )
 
@@ -176,6 +201,19 @@ class Settings(BaseSettings):
                 return None
         return str(v)
 
+    @field_validator("MODEL_PATH", mode="before")
+    @classmethod
+    def parse_model_path(cls, v: Any) -> Path | None:
+        """Allow None or empty string for MODEL_PATH, or coerce string to Path."""
+        if v is None:
+            return None
+        if isinstance(v, str):
+            v_clean = v.strip()
+            if not v_clean or v_clean.lower() in ("none", "null", ""):
+                return None
+            return Path(v_clean)
+        return Path(v)
+
     @field_validator("WEIGHTS_DIR", "REPORTS_DIR", "DATASETS_DIR", "UPLOAD_DIR", mode="before")
     @classmethod
     def coerce_to_path(cls, v: Any) -> Path:
@@ -195,8 +233,37 @@ class Settings(BaseSettings):
 
     @property
     def default_model_path(self) -> Path:
-        """Resolved path to the active YOLO model weight file."""
-        return self.WEIGHTS_DIR / self.DEFAULT_MODEL_NAME
+        """
+        Resolved path to the active YOLO model weight file.
+
+        Precedence:
+          1. MODEL_PATH: If explicitly configured, resolved as an absolute path
+             or relative to BASE_DIR. Never silently falls back if missing.
+          2. DEFAULT_MODEL_NAME alias: If mapped in MODEL_ALIASES, resolved within WEIGHTS_DIR.
+          3. DEFAULT_MODEL_NAME path: If an existing absolute/relative file path,
+             resolved directly. Otherwise, resolved within WEIGHTS_DIR.
+        """
+        if self.MODEL_PATH is not None:
+            if self.MODEL_PATH.is_absolute():
+                return self.MODEL_PATH
+            return (self.BASE_DIR / self.MODEL_PATH).resolve()
+
+        clean_name = self.DEFAULT_MODEL_NAME.strip()
+
+        # Check known registry aliases first
+        resolved_filename = self.MODEL_ALIASES.get(clean_name.lower())
+        if resolved_filename:
+            return self.WEIGHTS_DIR / resolved_filename
+
+        # Check if DEFAULT_MODEL_NAME was supplied as an explicit path
+        name_path = Path(clean_name)
+        if name_path.is_absolute():
+            return name_path
+        if (self.BASE_DIR / name_path).is_file():
+            return (self.BASE_DIR / name_path).resolve()
+
+        # Standard fallback: model inside WEIGHTS_DIR
+        return self.WEIGHTS_DIR / clean_name
 
     @property
     def is_production(self) -> bool:

@@ -2,594 +2,1270 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>SHM-AI Structural Inspection Report — {{ asset_name }}</title>
+    <title>SHM-AI Structural Inspection Dossier — {{ asset_name }}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
+        /* ═════════════════════════════════════════════════════════════════════
+           SHM-AI ARCHITECTURAL OLIVE & SAND DESIGN SYSTEM
+           Professional Civil & Structural Engineering Dossier
+           ═════════════════════════════════════════════════════════════════════ */
+
+        :root {
+            --color-deep-olive: #353B32;
+            --color-warm-ivory: #F0EDE4;
+            --color-soft-white: #FAF9F5;
+            --color-stone-grey: #77766D;
+            --color-terracotta: #A65D42;
+            --color-sage:       #66765A;
+            --color-ochre:      #B68A48;
+            --color-rust:       #9D3E32;
+            --color-border:     #DCD7CC;
+            --color-border-dark:#B0A99A;
+            --color-sand-tint:  #E8E3D7;
+
+            --font-serif: 'DM Serif Display', Georgia, Cambria, 'Times New Roman', serif;
+            --font-sans:  'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            --font-mono:  'JetBrains Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+        }
+
         @page {
-            size: A4;
-            margin: 2cm 2.2cm;
+            size: A4 portrait;
+            margin: 1.8cm 2cm;
             @bottom-center {
                 content: "SHM-AI Structural Inspection Dossier  |  Page " counter(page) " of " counter(pages);
-                font-family: Arial, Helvetica, sans-serif;
+                font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
                 font-size: 8pt;
-                color: #6c757d;
+                color: #77766D;
             }
         }
 
         * {
             box-sizing: border-box;
-        }
-
-        body {
-            font-family: Arial, Helvetica, sans-serif;
-            font-size: 10pt;
-            color: #212529;
-            line-height: 1.5;
             margin: 0;
             padding: 0;
         }
 
-        /* ── Header ─────────────────────────────────────────────── */
-        .report-header {
-            background-color: #1e3a5f;
-            color: #ffffff;
-            padding: 18px 22px 14px 22px;
-            margin-bottom: 18px;
-            border-radius: 4px;
-        }
-
-        .report-header h1 {
-            font-size: 18pt;
-            margin: 0 0 4px 0;
-            font-weight: bold;
-            letter-spacing: 0.3px;
-        }
-
-        .report-header .subtitle {
+        body {
+            font-family: var(--font-sans);
             font-size: 9.5pt;
-            color: #adb5bd;
-            margin: 0 0 12px 0;
+            color: var(--color-deep-olive);
+            background-color: var(--color-warm-ivory);
+            line-height: 1.55;
+            padding: 32px 24px;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
         }
 
-        .report-header .meta-row {
-            font-size: 8.5pt;
-            color: #ced4da;
-            border-top: 1px solid #2c5282;
-            padding-top: 8px;
+        .dossier-wrapper {
+            max-width: 980px;
+            margin: 0 auto;
         }
 
-        .report-header .meta-item {
-            display: inline-block;
-            margin-right: 20px;
+        /* ── Masthead Header ────────────────────────────────────────────── */
+        .masthead {
+            background-color: var(--color-soft-white);
+            border: 1px solid var(--color-border);
+            border-top: 4px solid var(--color-deep-olive);
+            padding: 26px 30px 22px 30px;
+            margin-bottom: 22px;
         }
 
-        /* ── Sections ────────────────────────────────────────────── */
-        .section {
-            margin-bottom: 18px;
-            page-break-inside: avoid;
-        }
-
-        .section-title {
-            font-size: 11pt;
-            font-weight: bold;
-            color: #1e3a5f;
-            border-bottom: 2px solid #1e3a5f;
-            padding-bottom: 4px;
-            margin-bottom: 8px;
-        }
-
-        .section-body {
-            background-color: #f8f9fa;
-            border: 1px solid #dee2e6;
-            border-radius: 4px;
-            padding: 12px 16px;
-        }
-
-        /* ── Health score ────────────────────────────────────────── */
-        .health-score-container {
+        .masthead-eyebrow {
             display: flex;
-            align-items: baseline;
-            gap: 12px;
-            margin-bottom: 8px;
-        }
-
-        .health-score-label {
-            font-size: 8.5pt;
-            color: #6c757d;
-            display: block;
-            margin-bottom: 4px;
-        }
-
-        .health-score {
-            font-size: 32pt;
-            font-weight: bold;
-            color: #1e3a5f;
-            line-height: 1;
-        }
-
-        .health-score-unit {
-            font-size: 11pt;
-            color: #6c757d;
-            vertical-align: super;
-        }
-
-        /* ── Badges ──────────────────────────────────────────────── */
-        .risk-badge {
-            display: inline-block;
-            padding: 4px 14px;
-            border-radius: 12px;
-            font-size: 10pt;
-            font-weight: bold;
-            color: #ffffff;
-            letter-spacing: 0.5px;
-            vertical-align: middle;
-            margin-left: 10px;
-        }
-
-        .action-badge {
-            display: inline-block;
-            padding: 5px 16px;
-            border-radius: 4px;
-            font-size: 12pt;
-            font-weight: bold;
-            color: #ffffff;
-            letter-spacing: 0.5px;
+            justify-content: space-between;
+            align-items: center;
+            font-family: var(--font-mono);
+            font-size: 8pt;
+            letter-spacing: 1.2px;
+            text-transform: uppercase;
+            color: var(--color-stone-grey);
             margin-bottom: 10px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--color-border);
         }
 
-        /* ── Key-value rows ──────────────────────────────────────── */
-        .info-row {
-            margin-bottom: 5px;
-            font-size: 9pt;
-        }
-
-        .info-label {
-            color: #6c757d;
-            display: inline-block;
-            width: 220px;
-            font-weight: 500;
-        }
-
-        .info-value {
-            color: #212529;
-            font-weight: bold;
-        }
-
-        /* ── Tables ──────────────────────────────────────────────── */
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 9pt;
-            margin-top: 4px;
-        }
-
-        th {
-            background-color: #1e3a5f;
-            color: #ffffff;
-            padding: 6px 10px;
-            text-align: left;
+        .masthead-eyebrow .system-id {
+            color: var(--color-deep-olive);
             font-weight: 600;
         }
 
-        td {
-            padding: 6px 10px;
-            border-bottom: 1px solid #dee2e6;
+        .masthead h1 {
+            font-family: var(--font-serif);
+            font-size: 24pt;
+            font-weight: 400;
+            line-height: 1.2;
+            color: var(--color-deep-olive);
+            letter-spacing: -0.3px;
+            margin-bottom: 4px;
         }
 
-        tr:nth-child(even) td {
-            background-color: #f8f9fa;
+        .masthead .subtitle {
+            font-size: 10pt;
+            color: var(--color-stone-grey);
+            margin-bottom: 18px;
+            font-weight: 400;
         }
 
-        /* ── Escalation trace ────────────────────────────────────── */
-        .trace-block {
-            background-color: #ffffff;
-            border: 1px solid #ced4da;
-            border-left: 4px solid #1e3a5f;
-            padding: 8px 12px;
-            margin-top: 8px;
+        .metadata-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            padding-top: 14px;
+            border-top: 1px solid var(--color-border);
+        }
+
+        .metadata-cell {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .meta-label {
+            font-family: var(--font-mono);
+            font-size: 7.5pt;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            color: var(--color-stone-grey);
+            font-weight: 500;
+        }
+
+        .meta-value {
+            font-size: 9pt;
+            font-weight: 600;
+            color: var(--color-deep-olive);
+            word-break: break-word;
+        }
+
+        .meta-value code {
+            font-family: var(--font-mono);
             font-size: 8.5pt;
+            font-weight: 500;
+        }
+
+        /* ── Sections ───────────────────────────────────────────────────── */
+        .section {
+            margin-bottom: 22px;
+            page-break-inside: avoid;
+        }
+
+        .section-header {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            border-bottom: 1px solid var(--color-deep-olive);
+            padding-bottom: 6px;
+            margin-bottom: 10px;
+        }
+
+        .section-title {
+            font-family: var(--font-serif);
+            font-size: 13pt;
+            font-weight: 400;
+            color: var(--color-deep-olive);
+            letter-spacing: -0.2px;
+        }
+
+        .section-num {
+            font-family: var(--font-mono);
+            font-size: 8pt;
+            color: var(--color-stone-grey);
+            letter-spacing: 0.5px;
+        }
+
+        .section-card {
+            background-color: var(--color-soft-white);
+            border: 1px solid var(--color-border);
+            padding: 16px 20px;
+        }
+
+        /* ── Executive Health Assessment Banner ─────────────────────────── */
+        .health-banner-grid {
+            display: grid;
+            grid-template-columns: 1.1fr 1fr;
+            gap: 20px;
+            align-items: stretch;
+        }
+
+        .score-block {
+            display: flex;
+            align-items: baseline;
+            gap: 14px;
+            padding-right: 18px;
+            border-right: 1px solid var(--color-border);
+        }
+
+        .score-number {
+            font-family: var(--font-serif);
+            font-size: 42pt;
+            line-height: 1;
+            color: var(--color-deep-olive);
+            font-weight: 400;
+        }
+
+        .score-denom {
+            font-family: var(--font-serif);
+            font-size: 14pt;
+            color: var(--color-stone-grey);
+        }
+
+        .score-meta {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .score-title {
+            font-family: var(--font-mono);
+            font-size: 7.5pt;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: var(--color-stone-grey);
+            font-weight: 600;
+        }
+
+        .score-desc {
+            font-size: 8.5pt;
+            color: var(--color-deep-olive);
+            line-height: 1.35;
+        }
+
+        .risk-action-block {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .dossier-pill-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .dossier-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            font-family: var(--font-mono);
+            font-size: 8pt;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border: 1px solid transparent;
+        }
+
+        .dossier-tag-risk {
+            color: #FAF9F5;
+        }
+
+        .dossier-tag-action {
+            color: #FAF9F5;
+        }
+
+        /* ── Badge Classes ──────────────────────────────────────────────── */
+        .badge {
+            display: inline-block;
+            padding: 2px 7px;
+            font-family: var(--font-mono);
+            font-size: 7.5pt;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            border: 1px solid transparent;
+        }
+
+        .badge-calibrated {
+            background-color: rgba(102, 118, 90, 0.12);
+            color: var(--color-sage);
+            border-color: rgba(102, 118, 90, 0.35);
+        }
+
+        .badge-uncalibrated {
+            background-color: rgba(182, 138, 72, 0.12);
+            color: var(--color-ochre);
+            border-color: rgba(182, 138, 72, 0.35);
+        }
+
+        .badge-requires_review, .badge-review {
+            background-color: rgba(157, 62, 50, 0.12);
+            color: var(--color-rust);
+            border-color: rgba(157, 62, 50, 0.35);
+        }
+
+        .badge-measured {
+            background-color: rgba(53, 59, 50, 0.08);
+            color: var(--color-deep-olive);
+            border-color: rgba(53, 59, 50, 0.25);
+        }
+
+        .badge-requires_calibration {
+            background-color: rgba(119, 118, 109, 0.12);
+            color: var(--color-stone-grey);
+            border-color: rgba(119, 118, 109, 0.3);
+        }
+
+        /* ── Key-Value Rows ─────────────────────────────────────────────── */
+        .info-row {
+            display: flex;
+            font-size: 8.5pt;
+            padding: 4px 0;
+            border-bottom: 1px solid rgba(220, 215, 204, 0.4);
+        }
+
+        .info-row:last-child {
+            border-bottom: none;
+        }
+
+        .info-label {
+            width: 220px;
+            color: var(--color-stone-grey);
+            font-weight: 500;
+            flex-shrink: 0;
+        }
+
+        .info-value {
+            color: var(--color-deep-olive);
+            font-weight: 600;
+            flex-grow: 1;
+        }
+
+        /* ── Dual Photographic Evidence Showcase ────────────────────────── */
+        .evidence-showcase {
+            margin-bottom: 12px;
+        }
+
+        .evidence-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px;
+            background-color: var(--color-soft-white);
+            border: 1px solid var(--color-border);
+            padding: 14px;
+        }
+
+        .evidence-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .evidence-panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-family: var(--font-mono);
+            font-size: 7.5pt;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            color: var(--color-stone-grey);
+            padding-bottom: 4px;
+            border-bottom: 1px solid var(--color-border);
+        }
+
+        .evidence-panel-header strong {
+            color: var(--color-deep-olive);
+        }
+
+        .evidence-frame {
+            position: relative;
+            background-color: #1A1D18;
+            border: 1px solid var(--color-border);
+            overflow: hidden;
+            aspect-ratio: 4 / 3;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .evidence-img {
+            display: block;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        .evidence-svg-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        .evidence-banner-strip {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 8px;
+            padding: 8px 12px;
+            background-color: var(--color-sand-tint);
+            border: 1px solid var(--color-border);
+            font-family: var(--font-mono);
+            font-size: 7.5pt;
+            color: var(--color-stone-grey);
+        }
+
+        .evidence-banner-strip code {
+            color: var(--color-deep-olive);
+            font-weight: 600;
+        }
+
+        /* ── Tables ─────────────────────────────────────────────────────── */
+        .table-wrap {
+            width: 100%;
+            overflow-x: auto;
+        }
+
+        table.dossier-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 8pt;
+            background-color: var(--color-soft-white);
+            border: 1px solid var(--color-border);
+        }
+
+        table.dossier-table th {
+            background-color: #ECE7DC;
+            color: var(--color-deep-olive);
+            font-family: var(--font-mono);
+            font-size: 7pt;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            padding: 8px 10px;
+            text-align: left;
+            border-bottom: 1px solid var(--color-border-dark);
+            font-weight: 600;
+        }
+
+        table.dossier-table td {
+            padding: 7px 10px;
+            border-bottom: 1px solid var(--color-border);
+            color: var(--color-deep-olive);
+            vertical-align: middle;
+        }
+
+        table.dossier-table tbody tr:nth-child(even) td {
+            background-color: #F5F2EB;
+        }
+
+        table.dossier-table tbody tr:hover td {
+            background-color: #ECE7DC;
+        }
+
+        .mono {
+            font-family: var(--font-mono);
+            font-variant-numeric: tabular-nums;
+        }
+
+        .ref-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 20px;
+            height: 20px;
+            padding: 0 4px;
+            background-color: var(--color-terracotta);
+            color: #FAF9F5;
+            font-family: var(--font-mono);
+            font-size: 7.5pt;
+            font-weight: 700;
+            margin-right: 4px;
+        }
+
+        /* ── Quality Metric Cards (4-Column Architectural Grid) ─────────── */
+        .quality-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+        }
+
+        .quality-card {
+            background-color: var(--color-soft-white);
+            border: 1px solid var(--color-border);
+            padding: 10px 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+
+        .quality-card-label {
+            font-family: var(--font-mono);
+            font-size: 7pt;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            color: var(--color-stone-grey);
+            font-weight: 500;
+        }
+
+        .quality-card-val {
+            font-family: var(--font-mono);
+            font-size: 10pt;
+            font-weight: 600;
+            color: var(--color-deep-olive);
+        }
+
+        .quality-card-sub {
+            font-size: 7.5pt;
+            color: var(--color-stone-grey);
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        /* ── Escalation Audit Trace ─────────────────────────────────────── */
+        .trace-card {
+            background-color: var(--color-sand-tint);
+            border: 1px solid var(--color-border);
+            border-left: 3px solid var(--color-deep-olive);
+            padding: 10px 14px;
+            margin-top: 10px;
+            font-size: 8pt;
+        }
+
+        .trace-header {
+            font-family: var(--font-mono);
+            font-size: 7.5pt;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            color: var(--color-deep-olive);
+            font-weight: 600;
+            margin-bottom: 6px;
         }
 
         .trace-applied {
-            color: #8e1414;
-            font-weight: bold;
+            color: var(--color-rust);
+            font-weight: 600;
         }
 
         .trace-not-applied {
-            color: #6c757d;
+            color: var(--color-stone-grey);
         }
 
-        /* ── Cost range ──────────────────────────────────────────── */
+        /* ── Cost Box ───────────────────────────────────────────────────── */
+        .cost-hero {
+            display: flex;
+            align-items: baseline;
+            gap: 12px;
+            margin-bottom: 4px;
+        }
+
         .cost-range {
-            font-size: 16pt;
-            font-weight: bold;
-            color: #1e3a5f;
-            margin: 4px 0;
-        }
-
-        .cost-basis {
-            font-size: 8.5pt;
-            color: #495057;
-            margin-top: 4px;
+            font-family: var(--font-serif);
+            font-size: 22pt;
+            color: var(--color-deep-olive);
+            font-weight: 400;
+            line-height: 1;
         }
 
         .cost-disclaimer {
             font-size: 8pt;
-            color: #6c757d;
+            color: var(--color-stone-grey);
+            margin-bottom: 8px;
             font-style: italic;
-            margin-bottom: 4px;
         }
 
-        /* ── Photographic Evidence ───────────────────────────────── */
-        .evidence-image {
-            max-width: 100%;
-            max-height: 380px;
-            object-fit: contain;
-            border: 1px solid #ced4da;
-            border-radius: 4px;
+        /* ── Sign-Off Section ───────────────────────────────────────────── */
+        .signoff-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            border: 1px solid var(--color-border);
+            background-color: var(--color-soft-white);
+        }
+
+        .signoff-box {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--color-border);
+        }
+
+        .signoff-box:nth-child(odd) {
+            border-right: 1px solid var(--color-border);
+        }
+
+        .signoff-label {
+            font-family: var(--font-mono);
+            font-size: 7pt;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            color: var(--color-stone-grey);
+            margin-bottom: 6px;
             display: block;
-            margin: 6px auto 10px;
+        }
+
+        .signoff-line {
+            display: block;
+            margin-top: 22px;
+            border-bottom: 1px dotted var(--color-stone-grey);
+            height: 1px;
+        }
+
+        /* ── Statutory Footer ───────────────────────────────────────────── */
+        .statutory-footer {
+            margin-top: 28px;
+            padding-top: 14px;
+            border-top: 1px solid var(--color-border);
+            font-size: 7.5pt;
+            color: var(--color-stone-grey);
+            text-align: justify;
+            line-height: 1.45;
+        }
+
+        .statutory-footer strong {
+            color: var(--color-deep-olive);
+            letter-spacing: 0.4px;
         }
 
         .bullet-list {
-            margin: 4px 0 0 16px;
+            margin: 4px 0 4px 18px;
             padding: 0;
-            font-size: 8.5pt;
-            color: #495057;
+            color: var(--color-deep-olive);
         }
 
         .bullet-list li {
             margin-bottom: 3px;
         }
 
-        /* ── Sign-off table ──────────────────────────────────────── */
-        .signoff-table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 8.5pt;
-            margin-top: 6px;
-        }
+        /* ── Print Styles ───────────────────────────────────────────────── */
+        @media print {
+            body {
+                background-color: #FFFFFF !important;
+                padding: 0 !important;
+                font-size: 9pt;
+            }
 
-        .signoff-table td {
-            padding: 8px 10px;
-            border: 1px solid #ced4da;
-            vertical-align: top;
-        }
+            .dossier-wrapper {
+                max-width: 100% !important;
+            }
 
-        /* ── Footer ──────────────────────────────────────────────── */
-        .report-footer {
-            margin-top: 24px;
-            padding-top: 8px;
-            border-top: 1px solid #dee2e6;
-            font-size: 7.5pt;
-            color: #6c757d;
-            line-height: 1.4;
+            .section-card, .masthead, .evidence-grid, .signoff-grid {
+                background-color: #FFFFFF !important;
+            }
+
+            .section {
+                page-break-inside: avoid;
+            }
+
+            .page-break {
+                page-break-before: always;
+            }
         }
     </style>
 </head>
 <body>
 
-<!-- ══════════════════════════ REPORT HEADER ══════════════════════════ -->
-<div class="report-header">
-    <h1>SHM-AI Structural Inspection Dossier</h1>
-    <div class="subtitle">AI-Directed Predictive Maintenance &amp; Structural Health Monitoring</div>
-    <div class="meta-row">
-        <span class="meta-item"><strong>Asset:</strong> {{ asset_name }} ({{ asset_id[:8] }})</span>
-        <span class="meta-item"><strong>Typology:</strong> {{ asset_type | upper }}</span>
-        <span class="meta-item"><strong>Inspection ID:</strong> {{ inspection_id[:8] }}</span>
-        <span class="meta-item"><strong>Assessed:</strong> {{ generated_at_utc }}</span>
-    </div>
-</div>
+<div class="dossier-wrapper">
 
-<!-- ══════════════════════════ EXECUTIVE SUMMARY / HEALTH SCORE ══════════════════════════ -->
-<div class="section">
-    <div class="section-title">Structural Health Score &amp; Risk Classification</div>
-    <div class="section-body">
-        <div class="health-score-container">
-            <div>
-                <span class="health-score-label">Deterministic Composite Health Score:</span>
-                <span class="health-score">{{ health_score_formatted }}</span>
-                <span class="health-score-unit">/ 100</span>
+    <!-- ══════════════════════════ 0. MASTHEAD ══════════════════════════ -->
+    <header class="masthead">
+        <div class="masthead-eyebrow">
+            <span><span class="system-id">SHM-AI</span> Structural Engineering Dossier</span>
+            <span>Document ID: <code>{{ inspection_id[:16] if inspection_id else "PREVIEW" }}</code></span>
+        </div>
+        <h1>Structural Condition Assessment Dossier</h1>
+        <div class="subtitle">AI-Assisted Computer Vision Analysis, Defect Quantification &amp; Maintenance Decision Audit</div>
+
+        <div class="metadata-grid">
+            <div class="metadata-cell">
+                <span class="meta-label">Monitored Asset</span>
+                <span class="meta-value">{{ asset_name }}</span>
+                <span class="meta-label" style="margin-top: 2px;">UUID: <code>{{ asset_id[:8] }}</code></span>
             </div>
-            <div>
-                <span class="risk-badge" style="background-color: {{ risk_level_color }};">
-                    RISK: {{ risk_level | upper }}
+            <div class="metadata-cell">
+                <span class="meta-label">Typology Category</span>
+                <span class="meta-value">{{ asset_type | upper }}</span>
+            </div>
+            <div class="metadata-cell">
+                <span class="meta-label">Source Inspection ID</span>
+                <span class="meta-value"><code>{{ inspection_id[:12] }}</code></span>
+            </div>
+            <div class="metadata-cell">
+                <span class="meta-label">Compiled Timestamp (UTC)</span>
+                <span class="meta-value mono">{{ generated_at_utc }}</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- ══════════════════════════ 1. HEALTH ASSESSMENT ══════════════════════════ -->
+    <section class="section">
+        <div class="section-header">
+            <h2 class="section-title">Structural Health Score &amp; Risk Classification</h2>
+            <span class="section-num">SECTION 01</span>
+        </div>
+        <div class="section-card">
+            <div class="health-banner-grid">
+                <div class="score-block">
+                    <div>
+                        <span class="score-number">{{ health_score_formatted }}</span>
+                        <span class="score-denom">/ 100</span>
+                    </div>
+                    <div class="score-meta">
+                        <span class="score-title">Deterministic Composite Score</span>
+                        <span class="score-desc">Calculated via noisy-OR multi-defect complementary formulation.</span>
+                    </div>
+                </div>
+
+                <div class="risk-action-block">
+                    <div class="dossier-pill-row">
+                        <span class="dossier-tag dossier-tag-risk" style="background-color: {{ risk_level_color }};">
+                            RISK LEVEL: {{ risk_level | upper }}
+                        </span>
+                        <span class="dossier-tag dossier-tag-action" style="background-color: {{ action_color }};">
+                            ACTION: {{ recommended_action | replace("_", " ") | upper }}
+                        </span>
+                    </div>
+                    <div class="info-row" style="border: none; padding: 0;">
+                        <span class="info-label" style="width: 170px;">Assessment Engine:</span>
+                        <span class="info-value">{{ assessment_method }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ══════════════════════════ 2. PHOTOGRAPHIC EVIDENCE & ANNOTATED MAP ══════════════════════════ -->
+    <section class="section">
+        <div class="section-header">
+            <h2 class="section-title">Photographic Inspection Evidence &amp; YOLO26 Defect Segmentation</h2>
+            <span class="section-num">SECTION 02</span>
+        </div>
+
+        {% if input_image_path %}
+        <div class="evidence-showcase">
+            <div class="evidence-grid">
+                <!-- Panel 1: Original Capture -->
+                <div class="evidence-panel">
+                    <div class="evidence-panel-header">
+                        <strong>Figure 1.1: Original Survey Photograph</strong>
+                        <span>Optical Capture</span>
+                    </div>
+                    <div class="evidence-frame">
+                        <img src="{{ image_data_uri or input_image_path }}" alt="Original Structural Evidence" class="evidence-img" />
+                    </div>
+                </div>
+
+                <!-- Panel 2: YOLO26 Annotated Defect Overlay -->
+                <div class="evidence-panel">
+                    <div class="evidence-panel-header">
+                        <strong>Figure 1.2: YOLO26 AI Defect Segmentation</strong>
+                        <span>{{ defect_count }} Segmented Region(s)</span>
+                    </div>
+                    <div class="evidence-frame">
+                        <img src="{{ image_data_uri or input_image_path }}" alt="Annotated Structural Evidence" class="evidence-img" />
+                        {% if detections %}
+                        <svg viewBox="0 0 {{ image_width }} {{ image_height }}" class="evidence-svg-layer" preserveAspectRatio="none">
+                            {% for det in detections %}
+                                {% if det.polygon_points %}
+                                <!-- Terracotta defect segmentation mask -->
+                                <polygon points="{{ det.polygon_points }}" fill="rgba(166, 93, 66, 0.28)" stroke="#A65D42" stroke-width="2.5" />
+                                {% endif %}
+
+                                {% if det.marker_x is defined and det.marker_x is not none %}
+                                <!-- Numbered circular annotation marker corresponding to defect inventory -->
+                                <g class="defect-annotation-marker">
+                                    <circle cx="{{ det.marker_x }}" cy="{{ det.marker_y }}" r="13" fill="#A65D42" stroke="#FAF9F5" stroke-width="1.8" />
+                                    <text x="{{ det.marker_x }}" y="{{ det.marker_y + 4.5 }}" text-anchor="middle" font-family="'Inter', sans-serif" font-size="9" font-weight="700" fill="#FAF9F5">{{ det.item_number or loop.index }}</text>
+                                </g>
+                                {% endif %}
+                            {% endfor %}
+                        </svg>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="evidence-banner-strip">
+                <div>Source: <code>{{ input_image_path }}</code></div>
+                <div>Model: <code>{{ model_name }}</code></div>
+                <div>Resolution: <strong>{{ image_width }} &times; {{ image_height }} px</strong></div>
+                <div>Detections: <strong>{{ defect_count }} defect(s)</strong> ({{ counting_method }})</div>
+            </div>
+        </div>
+        {% endif %}
+    </section>
+
+    <!-- ══════════════════════════ 3. NUMBERED DEFECT INVENTORY ══════════════════════════ -->
+    <section class="section">
+        <div class="section-header">
+            <h2 class="section-title">Defect Telemetry Inventory &amp; Dimensional Quantifications</h2>
+            <span class="section-num">SECTION 03</span>
+        </div>
+
+        {% if detections %}
+        <div class="table-wrap">
+            <table class="dossier-table">
+                <thead>
+                    <tr>
+                        <th style="width: 75px;">Ref #</th>
+                        <th>Classification</th>
+                        <th style="text-align: center;">Confidence</th>
+                        <th style="text-align: right;">Area (px²)</th>
+                        <th style="text-align: right;">Centerline (px)</th>
+                        <th style="text-align: right;">Avg Width (px)</th>
+                        <th style="text-align: right;">Max Width (px)</th>
+                        <th style="text-align: center;">Physical Metric (mm)</th>
+                        <th style="text-align: center;">Subsurface Depth</th>
+                        <th style="text-align: center;">Calibration Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for det in detections %}
+                    <tr>
+                        <td>
+                            <span class="ref-badge">{{ det.item_number or loop.index }}</span>
+                            <span class="mono" style="font-weight: 600;">{{ det.ref_id or ('#' ~ loop.index) }}</span>
+                        </td>
+                        <td><strong>{{ det.defect_type | replace("_", " ") | title }}</strong></td>
+                        <td style="text-align: center;" class="mono">{{ det.confidence_pct or ("%.1f" | format(det.confidence * 100) ~ '%') }}</td>
+                        <td style="text-align: right;" class="mono">{{ det.area_px }}</td>
+                        <td style="text-align: right;" class="mono">{{ det.length_px }}</td>
+                        <td style="text-align: right;" class="mono">{{ det.width_px }}</td>
+                        <td style="text-align: right;" class="mono">{{ det.max_width_px or "—" }}</td>
+                        <td style="text-align: center; font-size: 7.5pt;">
+                            {% if det.calibration_status == 'calibrated' and det.length_mm is not none %}
+                                <strong>{{ "%.2f" | format(det.length_mm) }} mm</strong> (L) &times; <strong>{{ "%.2f" | format(det.width_mm) }} mm</strong> (W)
+                                {% if det.area_mm2 is not none %}
+                                <br /><span style="font-size: 7pt; color: var(--color-stone-grey);">Area: {{ "%.1f" | format(det.area_mm2) }} mm²</span>
+                                {% endif %}
+                            {% else %}
+                                <span style="color: var(--color-ochre); font-weight: 500;">Requires Calibration</span>
+                            {% endif %}
+                        </td>
+                        <td style="text-align: center; font-size: 7.5pt; color: var(--color-stone-grey);">
+                            {{ det.depth_display or "Not Measured" }}
+                        </td>
+                        <td style="text-align: center;">
+                            <span class="badge badge-{{ det.measurement_status or 'requires_calibration' }}">
+                                {{ (det.measurement_status or 'requires_calibration') | replace("_", " ") | upper }}
+                            </span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div style="font-size: 7.5pt; color: var(--color-stone-grey); margin-top: 6px;">
+            * <em>Morphological Protocol: Centerline Length denotes the true topological skeleton path. Average and Maximum Widths are quantified along normal cross-sections via Euclidean distance transform. Metric values require optical Ground Sampling Distance (GSD) or reference marker calibration.</em>
+        </div>
+        {% else %}
+        <div class="section-card" style="text-align: center; color: var(--color-stone-grey);">
+            Zero defect detections recorded on this inspection media.
+        </div>
+        {% endif %}
+    </section>
+
+    <!-- ══════════════════════════ 4. DEFECT BREAKDOWN & FAILURE MODES ══════════════════════════ -->
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: 22px;">
+        <!-- Defect Breakdown -->
+        <section class="section" style="margin-bottom: 0;">
+            <div class="section-header">
+                <h2 class="section-title">Defect Severity Breakdown</h2>
+                <span class="section-num">SECTION 04A</span>
+            </div>
+            {% if severity_breakdown %}
+            <div class="table-wrap">
+                <table class="dossier-table">
+                    <thead>
+                        <tr>
+                            <th>Category</th>
+                            <th>Severity</th>
+                            <th style="text-align: right;">Count</th>
+                            <th style="text-align: right;">Total Area (mm²)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in severity_breakdown %}
+                        <tr>
+                            <td><strong>{{ item.category | replace("_", " ") | title }}</strong></td>
+                            <td class="mono" style="font-weight: 600;">{{ item.severity | upper }}</td>
+                            <td style="text-align: right;" class="mono">{{ item.observation_count }}</td>
+                            <td style="text-align: right;" class="mono">{{ item.area_formatted or "Requires Calibration" }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="section-card" style="font-size: 8.5pt; color: var(--color-stone-grey);">
+                Zero structural defect observations recorded in this inspection session.
+            </div>
+            {% endif %}
+        </section>
+
+        <!-- Failure Modes -->
+        <section class="section" style="margin-bottom: 0;">
+            <div class="section-header">
+                <h2 class="section-title">Inferred Failure Mechanisms</h2>
+                <span class="section-num">SECTION 04B</span>
+            </div>
+            {% if failure_modes %}
+            <div class="table-wrap">
+                <table class="dossier-table">
+                    <thead>
+                        <tr>
+                            <th>Mechanism</th>
+                            <th style="text-align: center;">Confidence</th>
+                            <th>Diagnosis</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for mode in failure_modes %}
+                        <tr>
+                            <td><strong>{{ mode.category | replace("_", " ") | title }}</strong></td>
+                            <td style="text-align: center;" class="mono">{{ mode.confidence_pct }}</td>
+                            <td style="font-size: 7.5pt;">{{ mode.description }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="section-card" style="font-size: 8.5pt; color: var(--color-stone-grey);">
+                Zero active limit-state failure modes triggered based on observed surface defect geometry.
+            </div>
+            {% endif %}
+        </section>
+    </div>
+
+    <!-- ══════════════════════════ 5. MAINTENANCE RECOMMENDATION & TIMELINE ══════════════════════════ -->
+    <section class="section">
+        <div class="section-header">
+            <h2 class="section-title">Maintenance Decision &amp; Action Timeline</h2>
+            <span class="section-num">SECTION 05</span>
+        </div>
+        <div class="section-card">
+            <div style="margin-bottom: 12px;">
+                <span class="dossier-tag dossier-tag-action" style="background-color: {{ action_color }}; font-size: 9pt; padding: 6px 14px;">
+                    RECOMMENDED INTERVENTION: {{ recommended_action | replace("_", " ") | upper }}
+                </span>
+            </div>
+
+            <div class="info-row">
+                <span class="info-label">Recommended Re-Inspection Interval:</span>
+                <span class="info-value">{{ next_inspection_formatted }} years</span>
+            </div>
+
+            <div class="trace-card">
+                <div class="trace-header">Decision Escalation Audit Trace</div>
+                <div class="info-row" style="border: none; padding: 2px 0;">
+                    <span class="info-label" style="width: 230px;">Baseline Action (from Risk Level):</span>
+                    <span class="info-value">{{ baseline_action | replace("_", " ") | upper }}</span>
+                </div>
+                <div class="info-row" style="border: none; padding: 2px 0;">
+                    <span class="info-label" style="width: 230px;">Failure-Mode Escalation:</span>
+                    {% if failure_mode_escalation_applied %}
+                    <span class="trace-applied">APPLIED — triggering: {{ triggering_failure_modes | join(", ") | replace("_", " ") | upper }}</span>
+                    {% else %}
+                    <span class="trace-not-applied">not applied</span>
+                    {% endif %}
+                </div>
+                <div class="info-row" style="border: none; padding: 2px 0;">
+                    <span class="info-label" style="width: 230px;">Degradation Escalation:</span>
+                    {% if degradation_escalation_applied %}
+                    <span class="trace-applied">APPLIED</span>
+                    {% else %}
+                    <span class="trace-not-applied">not applied</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ══════════════════════════ 6. ESTIMATED COST ══════════════════════════ -->
+    <section class="section">
+        <div class="section-header">
+            <h2 class="section-title">Indicative Maintenance Budget Estimate</h2>
+            <span class="section-num">SECTION 06</span>
+        </div>
+        <div class="section-card">
+            <div class="cost-disclaimer">Indicative budgetary range only — requires quantity surveying verification prior to contractor procurement.</div>
+            <div class="cost-hero">
+                <span class="cost-range">{{ cost_currency }} {{ cost_low_formatted }} – {{ cost_high_formatted }}</span>
+            </div>
+            <div class="info-row" style="margin-top: 6px;">
+                <span class="info-label">Parametric Cost Basis:</span>
+                <span class="info-value">{{ cost_basis }}</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- ══════════════════════════ 7. IMAGE QUALITY & SUITABILITY ══════════════════════════ -->
+    <section class="section">
+        <div class="section-header">
+            <h2 class="section-title">Photographic Evidence Quality &amp; Measurement Suitability</h2>
+            <span class="section-num">SECTION 07</span>
+        </div>
+        <div class="section-card">
+            <div class="quality-grid">
+                <div class="quality-card">
+                    <span class="quality-card-label">Resolution</span>
+                    <span class="quality-card-val">
+                        {% if image_quality and image_quality.width_px %}
+                        {{ image_quality.width_px }} &times; {{ image_quality.height_px }} px
+                        {% else %}
+                        {{ image_width }} &times; {{ image_height }} px
+                        {% endif %}
+                    </span>
+                    <span class="quality-card-sub">
+                        {{ image_quality.resolution_status if image_quality and image_quality.resolution_status else "Standard" }}
+                    </span>
+                </div>
+
+                <div class="quality-card">
+                    <span class="quality-card-label">Focus &amp; Sharpness</span>
+                    <span class="quality-card-val">
+                        {% set score = (image_quality.get('blur_score') if image_quality.get('blur_score') is not none else image_quality.get('focus_score')) if image_quality and image_quality.get else (image_quality.blur_score if image_quality and image_quality.blur_score is defined else none) %}
+                        {% if score is not none %}{{ score }}{% else %}&mdash;{% endif %}
+                    </span>
+                    <span class="quality-card-sub">
+                        {% if score is not none %}
+                            {% if score >= 100 %}Sharp Edge Definition{% elif score >= 40 %}Marginal Softening{% else %}Severe Blur{% endif %}
+                        {% else %}
+                            Unmeasured
+                        {% endif %}
+                    </span>
+                </div>
+
+                <div class="quality-card">
+                    <span class="quality-card-label">Exposure Balance</span>
+                    <span class="quality-card-val">
+                        {% set exp = image_quality.get('exposure_status') if image_quality and image_quality.get else (image_quality.exposure_status if image_quality and image_quality.exposure_status is defined else "Normal") %}
+                        {{ exp | title if exp else "Normal" }}
+                    </span>
+                    <span class="quality-card-sub">Contrast Gradients</span>
+                </div>
+
+                <div class="quality-card">
+                    <span class="quality-card-label">Suitability Grade</span>
+                    {% set suit = image_quality.get('suitability_status') if image_quality and image_quality.get else (image_quality.suitability_status if image_quality and image_quality.suitability_status is defined else "SUITABLE") %}
+                    <span class="quality-card-val" style="color: {% if suit == 'suitable' %}var(--color-sage){% elif suit == 'marginal' %}var(--color-ochre){% else %}var(--color-rust){% endif %};">
+                        {{ suit | upper if suit else "SUITABLE" }}
+                    </span>
+                    <span class="quality-card-sub">Photometric Metric</span>
+                </div>
+            </div>
+
+            {% if image_quality and image_quality.unsuitable_reasons %}
+            <div style="margin-top: 10px; padding: 8px 12px; background-color: rgba(182, 138, 72, 0.1); border-left: 3px solid var(--color-ochre); font-size: 8pt; color: var(--color-deep-olive);">
+                <strong>Quality Observations &amp; Limitations:</strong>
+                <ul class="bullet-list" style="margin-top: 4px;">
+                    {% for reason in image_quality.unsuitable_reasons %}
+                    <li>{{ reason }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+        </div>
+    </section>
+
+    <!-- ══════════════════════════ 8. CALIBRATION & DEPTH PROTOCOL ══════════════════════════ -->
+    <section class="section">
+        <div class="section-header">
+            <h2 class="section-title">Metric Calibration &amp; Subsurface Depth Governance</h2>
+            <span class="section-num">SECTION 08</span>
+        </div>
+        <div class="section-card">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                <div>
+                    <div class="info-row">
+                        <span class="info-label">Optical Scale Status:</span>
+                        <span class="badge badge-{{ calibration.status if calibration and calibration.status else 'uncalibrated' }}">
+                            {% if calibration and calibration.status == 'calibrated' %}
+                            CALIBRATED ({{ "%.4f" | format(calibration.pixel_to_mm_ratio) }} mm/px)
+                            {% else %}
+                            UNCALIBRATED (Pixel Space Only)
+                            {% endif %}
+                        </span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Scale Methodology:</span>
+                        <span class="info-value">
+                            {% if calibration and calibration.status == 'calibrated' %}
+                            {{ calibration.method | replace("_", " ") | title }} ({{ calibration.pixel_to_mm_ratio }} mm/px)
+                            {% else %}
+                            None (Uncalibrated Optical Photograph)
+                            {% endif %}
+                        </span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Scale Guidance:</span>
+                        <span class="info-value" style="font-size: 8pt; color: var(--color-stone-grey);">
+                            {{ calibration.guidance if calibration and calibration.guidance else "Include a coplanar reference marker (e.g. 50mm disc or optical caliper ruler) or specify camera sensor Ground Sampling Distance (GSD) to unlock certified millimeter metrics." }}
+                        </span>
+                    </div>
+                </div>
+
+                <div style="border-left: 1px solid var(--color-border); padding-left: 20px;">
+                    <div class="info-row">
+                        <span class="info-label">Subsurface Depth:</span>
+                        <span class="badge badge-requires_calibration">
+                            NOT MEASURED (2D OPTICAL)
+                        </span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Testing Protocol:</span>
+                        <span class="info-value" style="font-size: 8pt; color: var(--color-stone-grey);">
+                            {{ depth_disclosure }}
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ══════════════════════════ 9. MATERIAL DEGRADATION (COMPATIBILITY) ══════════════════════════ -->
+    {% if has_degradation and degradation %}
+    <section class="section">
+        <div class="section-header">
+            <h2 class="section-title">Material Degradation Assessment (Phase 4)</h2>
+            <span class="section-num">SECTION 09</span>
+        </div>
+        <div class="section-card">
+            <div class="info-row">
+                <span class="info-label">Carbonation Depth:</span>
+                <span class="info-value">{{ degradation.carbonation_depth_formatted }} mm</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Time to Depassivation:</span>
+                <span class="info-value">{{ degradation.time_to_depassivation }}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Corrosion Initiated:</span>
+                <span class="info-value">{% if degradation.corrosion_initiated %}Yes{% else %}No{% endif %}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Corrosion Index (0–1):</span>
+                <span class="info-value">{{ degradation.corrosion_index_formatted }}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Maintenance Required:</span>
+                <span class="badge {% if degradation.requires_maintenance %}badge-requires_review{% else %}badge-calibrated{% endif %}">
+                    {% if degradation.requires_maintenance %}YES{% else %}NO{% endif %}
                 </span>
             </div>
         </div>
-        <div class="info-row">
-            <span class="info-label">Assessment Methodology:</span>
-            <span class="info-value">{{ assessment_method }}</span>
-        </div>
-        <div class="info-row">
-            <span class="info-label">Traceable Source Inspection:</span>
-            <span class="info-value">{{ inspection_id }}</span>
-        </div>
-    </div>
-</div>
-
-<!-- ══════════════════════════ DEFECT SEVERITY BREAKDOWN ══════════════════════════ -->
-<div class="section">
-    <div class="section-title">Defect Severity &amp; Category Breakdown</div>
-    {% if severity_breakdown %}
-    <table>
-        <thead>
-            <tr>
-                <th>Defect Category</th>
-                <th>Observed Severity</th>
-                <th style="text-align: right;">Count</th>
-                <th style="text-align: right;">Total Area (mm²)</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for item in severity_breakdown %}
-            <tr>
-                <td>{{ item.category | replace("_", " ") | title }}</td>
-                <td>{{ item.severity | upper }}</td>
-                <td style="text-align: right;">{{ item.observation_count }}</td>
-                <td style="text-align: right;">{{ item.area_formatted or "—" }}</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+    </section>
     {% else %}
-    <div class="section-body">Zero structural defect observations recorded in this inspection session.</div>
+    <div style="display: none;">No Phase 4 Degradation Assessment Available</div>
     {% endif %}
-</div>
 
-<!-- ══════════════════════════ STRUCTURAL FAILURE MODES ══════════════════════════ -->
-<div class="section">
-    <div class="section-title">Inferred Structural Failure Mechanisms (Rules Engine)</div>
-    {% if failure_modes %}
-    <table>
-        <thead>
-            <tr>
-                <th>Failure Mechanism</th>
-                <th style="text-align: center;">Confidence</th>
-                <th>Engineering Mechanism Diagnosis</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for mode in failure_modes %}
-            <tr>
-                <td>{{ mode.category | replace("_", " ") | title }}</td>
-                <td style="text-align: center;">{{ mode.confidence_pct }}</td>
-                <td>{{ mode.description }}</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-    {% else %}
-    <div class="section-body">No critical failure modes triggered based on recorded defect morphology.</div>
-    {% endif %}
-</div>
-
-<!-- ══════════════════════════ MAINTENANCE RECOMMENDATION ══════════════════════════ -->
-<div class="section">
-    <div class="section-title">Maintenance Decision &amp; Action Timeline</div>
-    <div class="section-body">
-        <div>
-            <span class="action-badge" style="background-color: {{ action_color }};">
-                RECOMMENDED ACTION: {{ recommended_action | replace("_", " ") | upper }}
-            </span>
+    <!-- ══════════════════════════ 10. METHODOLOGY & DISCLOSURES ══════════════════════════ -->
+    <section class="section">
+        <div class="section-header">
+            <h2 class="section-title">Engineering Methodology &amp; Disclosures</h2>
+            <span class="section-num">SECTION 10</span>
         </div>
-        <div class="info-row">
-            <span class="info-label">Recommended Re-Inspection Interval:</span>
-            <span class="info-value">{{ next_inspection_formatted }} years</span>
-        </div>
-
-        <div class="trace-block">
-            <strong>Decision Escalation Audit Trace</strong>
-            <div class="info-row" style="margin-top: 5px;">
-                <span class="info-label">Baseline action (from risk level):</span>
-                <span class="info-value">{{ baseline_action | replace("_", " ") | upper }}</span>
+        <div class="section-card" style="font-size: 8.5pt;">
+            <div class="info-row" style="flex-direction: column; gap: 4px;">
+                <span class="info-label">Data Sources &amp; Pipelines:</span>
+                <ul class="bullet-list">
+                    {% for src in data_sources %}
+                    <li>{{ src }}</li>
+                    {% endfor %}
+                </ul>
             </div>
-            <div class="info-row">
-                <span class="info-label">Failure-mode escalation:</span>
-                {% if failure_mode_escalation_applied %}
-                <span class="trace-applied">APPLIED — triggering: {{ triggering_failure_modes | join(", ") | replace("_", " ") | upper }}</span>
-                {% else %}
-                <span class="trace-not-applied">not applied</span>
-                {% endif %}
+            <div class="info-row" style="flex-direction: column; gap: 4px; margin-top: 8px;">
+                <span class="info-label">Engineering Assumptions:</span>
+                <ul class="bullet-list">
+                    {% for item in assumptions %}
+                    <li>{{ item }}</li>
+                    {% endfor %}
+                </ul>
             </div>
-        </div>
-    </div>
-</div>
-
-<!-- ══════════════════════════ ESTIMATED COST ══════════════════════════ -->
-<div class="section">
-    <div class="section-title">Indicative Maintenance Budget Estimate</div>
-    <div class="section-body">
-        <div class="cost-disclaimer">Indicative budgetary range only — requires quantity surveying verification prior to procurement.</div>
-        <div class="cost-range">{{ cost_currency }}&nbsp;{{ cost_low_formatted }}&nbsp;–&nbsp;{{ cost_high_formatted }}</div>
-        <div class="cost-basis"><strong>Parametric Basis:</strong> {{ cost_basis }}</div>
-    </div>
-</div>
-
-{% if has_degradation %}
-<!-- ══════════════════════════ MATERIAL DEGRADATION (COMPATIBILITY) ══════════════════════════ -->
-<div class="section">
-    <div class="section-title">Material Degradation Assessment (Phase 4)</div>
-    <div class="section-body">
-        <div class="info-row">
-            <span class="info-label">Carbonation Depth:</span>
-            <span class="info-value">{{ degradation.carbonation_depth_formatted }} mm</span>
-        </div>
-        <div class="info-row">
-            <span class="info-label">Time to Depassivation:</span>
-            <span class="info-value">{{ degradation.time_to_depassivation }}</span>
-        </div>
-        <div class="info-row">
-            <span class="info-label">Corrosion Initiated:</span>
-            <span class="info-value">{% if degradation.corrosion_initiated %}Yes{% else %}No{% endif %}</span>
-        </div>
-        <div class="info-row">
-            <span class="info-label">Corrosion Index (0–1):</span>
-            <span class="info-value">{{ degradation.corrosion_index_formatted }}</span>
-        </div>
-        <div class="info-row">
-            <span class="info-label">Maintenance Required:</span>
-            {% if degradation.requires_maintenance %}
-            <span class="flag-yes">YES</span>
-            {% else %}
-            <span class="flag-no">NO</span>
+            <div class="info-row" style="flex-direction: column; gap: 4px; margin-top: 8px;">
+                <span class="info-label">Structural Limitations:</span>
+                <ul class="bullet-list">
+                    {% for item in limitations %}
+                    <li>{{ item }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% if missing_inputs %}
+            <div class="info-row" style="flex-direction: column; gap: 4px; margin-top: 8px;">
+                <span class="info-label" style="color: var(--color-terracotta);">Missing / Uncalibrated Inputs:</span>
+                <ul class="bullet-list">
+                    {% for item in missing_inputs %}
+                    <li style="color: var(--color-terracotta);">{{ item }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
             {% endif %}
         </div>
-    </div>
-</div>
-{% else %}
-<div class="placeholder" style="display: none;">
-    <div class="placeholder-title">No Phase 4 Degradation Assessment Available</div>
-</div>
-{% endif %}
+    </section>
 
-<!-- ══════════════════════════ PHOTOGRAPHIC EVIDENCE & DEFECT GALLERY ══════════════════════════ -->
-<div class="section">
-    <div class="section-title">Photographic Inspection Evidence &amp; Detections</div>
-    <div class="section-body">
-        {% if input_image_path %}
-        <div style="text-align: center;">
-            <img src="{{ input_image_path }}" alt="Inspection Evidence" class="evidence-image" />
-            <div style="font-size: 8pt; color: #6c757d; margin-bottom: 8px;">Source: {{ input_image_path }}</div>
+    <!-- ══════════════════════════ 11. PROFESSIONAL SIGN-OFF ══════════════════════════ -->
+    <section class="section">
+        <div class="section-header">
+            <h2 class="section-title">Professional Structural Engineer Sign-Off</h2>
+            <span class="section-num">SECTION 11</span>
         </div>
-        {% endif %}
+        <div class="signoff-grid">
+            <div class="signoff-box">
+                <span class="signoff-label">Reviewing Engineer Name</span>
+                <span class="signoff-line">&nbsp;</span>
+            </div>
+            <div class="signoff-box">
+                <span class="signoff-label">Professional License / Registration #</span>
+                <span class="signoff-line">&nbsp;</span>
+            </div>
+            <div class="signoff-box">
+                <span class="signoff-label">Formal Engineering Disposition</span>
+                <div style="display: flex; gap: 14px; margin-top: 8px; font-size: 8pt; color: var(--color-deep-olive);">
+                    <label style="display: inline-flex; align-items: center; gap: 4px;">&#9633; Approved</label>
+                    <label style="display: inline-flex; align-items: center; gap: 4px;">&#9633; Modifications Required</label>
+                    <label style="display: inline-flex; align-items: center; gap: 4px;">&#9633; Rejected</label>
+                </div>
+            </div>
+            <div class="signoff-box">
+                <span class="signoff-label">Professional Seal &amp; Signature / Date</span>
+                <span class="signoff-line">&nbsp;</span>
+            </div>
+        </div>
+    </section>
 
-        {% if detections %}
-        <table>
-            <thead>
-                <tr>
-                    <th>Ref #</th>
-                    <th>Classification</th>
-                    <th style="text-align: center;">Confidence</th>
-                    <th style="text-align: right;">Area (px²)</th>
-                    <th style="text-align: right;">Length (px)</th>
-                    <th style="text-align: right;">Width (px)</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for det in detections %}
-                <tr>
-                    <td>#{{ loop.index }}</td>
-                    <td>{{ det.defect_type | replace("_", " ") | title }}</td>
-                    <td style="text-align: center;">{{ "%.1f" | format(det.confidence * 100) }}%</td>
-                    <td style="text-align: right;">{{ det.area_px or "—" }}</td>
-                    <td style="text-align: right;">{{ det.length_px or "—" }}</td>
-                    <td style="text-align: right;">{{ det.width_px or "—" }}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-        {% else %}
-        <div style="font-size: 8.5pt; color: #6c757d;">Zero defect detections recorded on this inspection media.</div>
-        {% endif %}
-    </div>
-</div>
+    <!-- ══════════════════════════ 12. PROVENANCE METADATA ══════════════════════════ -->
+    <section class="section">
+        <div class="section-header">
+            <h2 class="section-title">Dossier Provenance &amp; Engine Telemetry</h2>
+            <span class="section-num">SECTION 12</span>
+        </div>
+        <div class="section-card" style="font-size: 8pt; color: var(--color-stone-grey);">
+            <div class="info-row">
+                <span class="info-label">SHM-AI Core Service Version:</span>
+                <span class="info-value mono">{{ service_version }}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Dossier Template Version:</span>
+                <span class="info-value mono">{{ generator_version }}</span>
+            </div>
+            {% if engine_versions %}
+            <div class="info-row">
+                <span class="info-label">Active Diagnostic Modules:</span>
+                <span class="info-value mono">
+                    {%- for name, ver in engine_versions.items() %}{{ name }}: {{ ver }}{% if not loop.last %}; {% endif %}{% endfor -%}
+                </span>
+            </div>
+            {% endif %}
+            <div class="info-row">
+                <span class="info-label">Compiled Timestamp (UTC):</span>
+                <span class="info-value mono">{{ generated_at_utc }}</span>
+            </div>
+        </div>
+    </section>
 
-<!-- ══════════════════════════ METHODOLOGY & GOVERNANCE ══════════════════════════ -->
-<div class="section">
-    <div class="section-title">Engineering Methodology &amp; Disclosures</div>
-    <div class="section-body" style="font-size: 8.5pt;">
-        <div class="info-row">
-            <span class="info-label">Data Sources:</span>
-            <ul class="bullet-list">
-                {% for src in data_sources %}
-                <li>{{ src }}</li>
-                {% endfor %}
-            </ul>
-        </div>
-        <div class="info-row" style="margin-top: 6px;">
-            <span class="info-label">Engineering Assumptions:</span>
-            <ul class="bullet-list">
-                {% for item in assumptions %}
-                <li>{{ item }}</li>
-                {% endfor %}
-            </ul>
-        </div>
-        <div class="info-row" style="margin-top: 6px;">
-            <span class="info-label">Structural Limitations:</span>
-            <ul class="bullet-list">
-                {% for item in limitations %}
-                <li>{{ item }}</li>
-                {% endfor %}
-            </ul>
-        </div>
-        {% if missing_inputs %}
-        <div class="info-row" style="margin-top: 6px;">
-            <span class="info-label">Missing / Uncalibrated Data:</span>
-            <ul class="bullet-list">
-                {% for item in missing_inputs %}
-                <li style="color: #b7410e;">{{ item }}</li>
-                {% endfor %}
-            </ul>
-        </div>
-        {% endif %}
-    </div>
-</div>
+    <!-- ══════════════════════════ STATUTORY NOTICE ══════════════════════════ -->
+    <footer class="statutory-footer">
+        <strong>STATUTORY CIVIL ENGINEERING NOTICE:</strong>
+        This dossier was compiled by an automated structural health monitoring intelligence pipeline.
+        Defect telemetry, severity classifications, and intervention recommendations are preliminary automated screenings.
+        Prior to initiating remedial intervention, structural shoring, or budgetary commitment, all findings must be reviewed
+        and formally validated on-site by a licensed structural engineer (PE / CEng MIStructE).
+    </footer>
 
-<!-- ══════════════════════════ PROFESSIONAL SIGN-OFF ══════════════════════════ -->
-<div class="section">
-    <div class="section-title">Professional Structural Engineer Sign-Off</div>
-    <div class="section-body">
-        <table class="signoff-table">
-            <tr>
-                <td style="width: 50%;">
-                    <strong>Reviewing Engineer Name:</strong><br />
-                    <span style="display: block; margin-top: 14px; border-bottom: 1px dotted #999;">&nbsp;</span>
-                </td>
-                <td style="width: 50%;">
-                    <strong>Professional License / Registration #:</strong><br />
-                    <span style="display: block; margin-top: 14px; border-bottom: 1px dotted #999;">&nbsp;</span>
-                </td>
-            </tr>
-            <tr>
-                <td>
-                    <strong>Formal Decision:</strong><br />
-                    <label style="margin-right: 15px;">&#9633; Approved</label>
-                    <label style="margin-right: 15px;">&#9633; Approved with Modifications</label>
-                    <label>&#9633; Rejected</label>
-                </td>
-                <td>
-                    <strong>Signature &amp; Date:</strong><br />
-                    <span style="display: block; margin-top: 14px; border-bottom: 1px dotted #999;">&nbsp;</span>
-                </td>
-            </tr>
-        </table>
-    </div>
-</div>
-
-<!-- ══════════════════════════ REPORT METADATA ══════════════════════════ -->
-<div class="section">
-    <div class="section-title">Dossier Provenance Metadata</div>
-    <div class="section-body" style="font-size: 8pt; color: #495057;">
-        <div class="info-row">
-            <span class="info-label">Service Version:</span>
-            <span class="info-value">{{ service_version }}</span>
-        </div>
-        <div class="info-row">
-            <span class="info-label">Dossier Generator Version:</span>
-            <span class="info-value">{{ generator_version }}</span>
-        </div>
-        {% if engine_versions %}
-        <div class="info-row">
-            <span class="info-label">Sub-Engine Modules:</span>
-            <span class="info-value">
-                {%- for name, ver in engine_versions.items() %}{{ name }}: {{ ver }}{% if not loop.last %}; {% endif %}{% endfor -%}
-            </span>
-        </div>
-        {% endif %}
-        <div class="info-row">
-            <span class="info-label">Compiled Timestamp (UTC):</span>
-            <span class="info-value">{{ generated_at_utc }}</span>
-        </div>
-    </div>
-</div>
-
-<!-- ══════════════════════════ LEGAL DISCLAIMER ══════════════════════════ -->
-<div class="report-footer">
-    <strong>STATUTORY ENGINEERING NOTICE:</strong>
-    This document is generated by an automated structural health monitoring intelligence platform.
-    Defect telemetry, severity classifications, and intervention recommendations are indicative preliminary findings.
-    Prior to initiating remedial intervention, structural shoring, or budgetary commitment, all findings must be reviewed
-    and formally validated on-site by a licensed structural engineer (PE / CEng MIStructE).
 </div>
 
 </body>

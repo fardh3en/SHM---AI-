@@ -25,7 +25,18 @@ export interface Detection {
   area_px: number | null
   length_px: number | null
   width_px: number | null
+  max_width_px?: number | null
+  vertical_extent_px?: number | null
   orientation_deg: number | null
+  length_mm?: number | null
+  width_mm?: number | null
+  max_width_mm?: number | null
+  area_mm2?: number | null
+  calibration_status?: string
+  measurement_status?: string
+  depth_status?: string
+  depth_mm?: number | null
+  unavailability_reasons?: string[]
   tile_x: number | null
   tile_y: number | null
   source_image: string | null

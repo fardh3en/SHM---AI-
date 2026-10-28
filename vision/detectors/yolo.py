@@ -260,7 +260,13 @@ class YOLO11Detector(IDetector):
                     confidence=confidence,
                     bbox=xyxy,
                     mask=mask_array,
+                    class_id=class_idx,
+                    class_name=class_name,
                 )
             )
 
         return detections
+
+
+# Semantic alias for YOLOv8 crack detection models sharing the Ultralytics engine
+YOLOv8CrackDetector = YOLO11Detector

@@ -228,18 +228,125 @@ async def generate_report(
     rec_service = RecommendationService()
     rec_report = rec_service.assess(rec_input)
 
-    # 5. Retrieve detections & image path for defect gallery
+    # 5. Assess image quality, dimensions & data URI
+    image_quality_dict: dict[str, Any] | None = None
+    img_w, img_h = 1000, 1000
+    image_data_uri: str | None = None
+    if inspection.input_path:
+        full_path = (settings.BASE_DIR / inspection.input_path).resolve()
+        if not full_path.is_file():
+            full_path = (settings.UPLOAD_DIR / "evidence" / Path(inspection.input_path).name).resolve()
+        if full_path.is_file():
+            try:
+                import base64
+                import mimetypes
+                mime, _ = mimetypes.guess_type(str(full_path))
+                mime = mime or "image/jpeg"
+                b64 = base64.b64encode(full_path.read_bytes()).decode("ascii")
+                image_data_uri = f"data:{mime};base64,{b64}"
+            except Exception as e_b64:
+                logger.warning(f"Could not encode image to data URI: {e_b64}")
+
+            try:
+                from PIL import Image
+                with Image.open(full_path) as im:
+                    img_w, img_h = im.size
+                import cv2
+                mat = cv2.imread(str(full_path))
+                if mat is not None:
+                    from vision.calibration.image_quality import ImageQualityAnalyzer
+                    q = ImageQualityAnalyzer.analyze(
+                        mat,
+                        image_id=full_path.name,
+                        image_format=full_path.suffix.lstrip(".").upper(),
+                    )
+                    image_quality_dict = q.model_dump()
+            except Exception as q_err:
+                logger.warning(f"Could not compute image quality for report: {q_err}")
+
+    # 5b. Retrieve detections & construct defect gallery
     detections = await detection_repo.get_by_inspection(inspection.id)
-    det_dicts = [
-        {
-            "defect_type": d.defect_type.value,
-            "confidence": d.confidence,
-            "area_px": f"{d.area_px:,.0f}" if d.area_px is not None else None,
-            "length_px": f"{d.length_px:.1f}" if d.length_px is not None else None,
-            "width_px": f"{d.width_px:.2f}" if d.width_px is not None else None,
-        }
-        for d in detections
-    ]
+    det_dicts: list[dict[str, Any]] = []
+    is_any_calibrated = False
+
+    for idx, d in enumerate(detections):
+        ref_id = f"CRK-{idx + 1:02d}"
+        vert_px = d.vertical_extent_px
+        max_w_px = d.max_width_px
+        len_mm = d.length_mm
+        w_mm = d.width_mm
+        max_w_mm = d.max_width_mm
+        a_mm2 = d.area_mm2
+        cal_status = d.calibration_status
+        meas_status = d.measurement_status
+        depth_stat = d.depth_status
+        depth_val = d.depth_mm
+
+        if cal_status == "calibrated" or w_mm is not None:
+            is_any_calibrated = True
+
+        poly_points = ""
+        marker_x = None
+        marker_y = None
+        if d.mask_polygon and "coordinates" in d.mask_polygon:
+            coords = d.mask_polygon.get("coordinates")
+            if coords and len(coords) > 0 and len(coords[0]) > 0:
+                poly_points = " ".join(f"{pt[0]},{pt[1]}" for pt in coords[0])
+                pts = coords[0]
+                marker_x = round(sum(pt[0] for pt in pts) / len(pts), 1)
+                marker_y = round(sum(pt[1] for pt in pts) / len(pts), 1)
+        elif d.bbox_x1 is not None and d.bbox_x2 is not None:
+            marker_x = round(((d.bbox_x1 + d.bbox_x2) / 2) * img_w, 1)
+            marker_y = round(((d.bbox_y1 + d.bbox_y2) / 2) * img_h, 1)
+
+        det_dicts.append(
+            {
+                "ref_id": ref_id,
+                "item_number": idx + 1,
+                "marker_x": marker_x,
+                "marker_y": marker_y,
+                "defect_type": d.defect_type.value,
+                "confidence": d.confidence,
+                "confidence_pct": f"{d.confidence * 100:.1f}%",
+                "bbox_coords": f"[{d.bbox_x1:.3f}, {d.bbox_y1:.3f}] → [{d.bbox_x2:.3f}, {d.bbox_y2:.3f}]",
+                "bbox_norm": [d.bbox_x1, d.bbox_y1, d.bbox_x2, d.bbox_y2],
+                "area_px": f"{d.area_px:,.0f}" if d.area_px is not None else "—",
+                "length_px": f"{d.length_px:.1f}" if d.length_px is not None else "—",
+                "width_px": f"{d.width_px:.2f}" if d.width_px is not None else "—",
+                "max_width_px": f"{max_w_px:.2f}" if max_w_px is not None else "—",
+                "vertical_extent_px": f"{vert_px:.1f}" if vert_px is not None else "—",
+                "orientation_deg": f"{d.orientation_deg:.1f}°" if d.orientation_deg is not None else "—",
+                "length_mm": f"{len_mm:.1f} mm" if len_mm is not None else "Requires Calibration",
+                "width_mm": f"{w_mm:.2f} mm" if w_mm is not None else "Requires Calibration",
+                "max_width_mm": f"{max_w_mm:.2f} mm" if max_w_mm is not None else "Requires Calibration",
+                "area_mm2": f"{a_mm2:,.1f} mm²" if a_mm2 is not None else "Requires Calibration",
+                "depth_status": depth_stat,
+                "depth_display": f"{depth_val:.1f} mm" if depth_val is not None else "Not Measured (2D Image)",
+                "calibration_status": cal_status,
+                "measurement_status": meas_status,
+                "unavailability_reasons": d.unavailability_reasons or (
+                    ["Uncalibrated optical photograph; no Ground Sampling Distance or reference marker provided."]
+                    if not is_any_calibrated else []
+                ),
+                "polygon_points": poly_points,
+            }
+        )
+
+    # 5c. Calibration summary
+    calibration_dict: dict[str, Any] = {
+        "status": "calibrated" if is_any_calibrated else "uncalibrated",
+        "method": "ground_sampling_distance" if is_any_calibrated else "none",
+        "pixel_to_mm_ratio": None,
+        "reference_object": None,
+        "limitations": [
+            "2D surface visual observation only. Internal concrete reinforcement, voiding, and tendon condition unassessed.",
+            "Absence of optical reference scale prevents certified millimeter conversion without metric camera calibration.",
+        ] if not is_any_calibrated else [],
+        "guidance": (
+            "To obtain certified millimeter dimensions, include a physical reference marker (e.g. 50mm calibration disc or scale ruler) "
+            "coplanar with the structural surface, or provide camera focal length and sensor Ground Sampling Distance (GSD)."
+        ),
+    }
 
     # 6. Render presentation HTML
     generator = ReportGenerator()
@@ -258,7 +365,14 @@ async def generate_report(
             "assumptions": assessment.assumptions,
             "limitations": assessment.limitations,
             "missing_inputs": assessment.missing_inputs,
+            "model_name": assessment.model_name or "shm_ai_crack_seg_finetune_15e_best.pt",
         },
+        image_quality=image_quality_dict,
+        calibration_info=calibration_dict,
+        model_name=assessment.model_name or "shm_ai_crack_seg_finetune_15e_best.pt",
+        image_width=img_w,
+        image_height=img_h,
+        image_data_uri=image_data_uri,
     )
 
     # 7. Persist report file

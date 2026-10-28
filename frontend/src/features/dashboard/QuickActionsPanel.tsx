@@ -2,7 +2,6 @@ import { Link } from 'react-router-dom'
 import {
   UploadCloud,
   Layers,
-  Box,
   ScanLine,
   FileText,
   ArrowRight,
@@ -33,13 +32,6 @@ const ACTIONS: ActionItem[] = [
     label: 'Asset Registry',
     description: 'Register and manage monitored civil structures.',
     href: '/assets',
-    available: true,
-  },
-  {
-    icon: Box,
-    label: '3D Structural Health',
-    description: 'Interactive spatial twin and condition telemetry.',
-    href: '/structural-health',
     available: true,
   },
   {

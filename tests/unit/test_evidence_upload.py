@@ -217,3 +217,50 @@ def test_end_to_end_upload_to_inspection_inference():
     assert len(dets) == 1
     assert dets[0]["defect_type"] == "crack"
     assert dets[0]["source_image"] == file_path
+
+
+def test_upload_with_various_jpeg_mime_types():
+    """Verify JPEG upload accepts image/jpg and image/pjpeg MIME variants."""
+    test_bytes = _generate_test_image("JPEG")
+    for mime in ["image/jpeg", "image/jpg", "image/pjpeg"]:
+        files = {"file": ("test_mime.jpg", test_bytes, mime)}
+        res = client.post("/api/v1/evidence/upload", files=files)
+        assert res.status_code == 201, f"Failed for MIME {mime}: {res.text}"
+
+
+def test_static_file_serving_for_uploaded_image():
+    """Verify uploaded image can be retrieved via HTTP GET /uploads/... with correct MIME."""
+    test_bytes = _generate_test_image("JPEG")
+    files = {"file": ("served_test.jpg", test_bytes, "image/jpeg")}
+    upload_res = client.post("/api/v1/evidence/upload", files=files)
+    assert upload_res.status_code == 201
+    file_path = upload_res.json()["file_path"]
+
+    get_res = client.get(file_path)
+    assert get_res.status_code == 200
+    assert "image/jpeg" in get_res.headers.get("content-type", "")
+    assert len(get_res.content) == len(test_bytes)
+
+
+def test_list_inspections_returns_newest_first():
+    """Verify GET /api/v1/inspections/ returns newest inspection at index 0."""
+    import time
+    time.sleep(1.05)  # Ensure distinct second-level timestamp in SQLite CURRENT_TIMESTAMP
+
+    # Create asset
+    asset_res = client.post("/api/v1/assets/", json={"name": "Ordering Test Asset", "asset_type": "building"})
+    asset_id = asset_res.json()["id"]
+
+    # Create inspection
+    insp_res = client.post(
+        "/api/v1/inspections/",
+        json={"asset_id": asset_id, "source": "image", "input_path": "/uploads/test.jpg"},
+    )
+    assert insp_res.status_code == 201
+    created_id = insp_res.json()["id"]
+
+    list_res = client.get("/api/v1/inspections/?page=1&page_size=10")
+    assert list_res.status_code == 200
+    items = list_res.json()["items"]
+    assert items[0]["id"] == created_id, f"Expected {created_id} as first item, got {items[0]['id']}"
+

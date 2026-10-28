@@ -49,7 +49,7 @@ export const COLUMN_C03_DEFECT: DefectDiagnosticTelemetry = {
   concreteCoverMm: 40,
   rebarClearanceMm: 12,
   orientation: 'Diagonal Shear, ~48° from horizontal',
-  confidence: '94% (YOLO11-seg + Sub-pixel Edge Trace)',
+  confidence: 'Demonstration simulation (Ultrasonic Pulse Echo model)',
   ndtMethod: 'Stereo Photogrammetry + Ultrasonic Pulse Echo (UPV)',
   calibrationStatus: 'Calibrated (0.24 mm/px @ 1.2m focal distance)',
   deteriorationType: 'Concrete cover micro-cracking & localized carbonation ingress',

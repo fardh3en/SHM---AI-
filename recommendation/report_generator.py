@@ -13,6 +13,8 @@ Traceability:
 from __future__ import annotations
 
 import datetime
+import base64
+import mimetypes
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, cast
@@ -31,20 +33,20 @@ from recommendation.schemas import (  # noqa: TC001
 #: Default template directory — shipped alongside this module.
 _DEFAULT_TEMPLATE_DIR: Path = Path(__file__).parent / "templates"
 
-#: Hex colours for each RiskLevel value.
+#: Hex colours for each RiskLevel value (Architectural Olive & Sand visual identity).
 _RISK_LEVEL_COLORS: dict[str, str] = {
-    "low": "#27ae60",
-    "medium": "#e67e22",
-    "high": "#e74c3c",
-    "critical": "#8e1414",
+    "low": "#66765A",       # Sage
+    "medium": "#B68A48",    # Muted ochre
+    "high": "#9D3E32",      # Deep rust
+    "critical": "#9D3E32",  # Deep rust
 }
 
-#: Hex colours for each RecommendedActionType value.
+#: Hex colours for each RecommendedActionType value (Architectural Olive & Sand visual identity).
 _ACTION_COLORS: dict[str, str] = {
-    "monitor": "#27ae60",
-    "inspect": "#e67e22",
-    "repair": "#e74c3c",
-    "emergency_intervention": "#8e1414",
+    "monitor": "#66765A",                # Sage
+    "inspect": "#B68A48",                # Muted ochre
+    "repair": "#A65D42",                 # Muted terracotta
+    "emergency_intervention": "#9D3E32", # Deep rust
 }
 
 
@@ -81,6 +83,12 @@ def _build_context(
     input_image_path: str | None = None,
     detections: list[dict[str, Any]] | None = None,
     assessment_meta: dict[str, Any] | None = None,
+    image_quality: dict[str, Any] | None = None,
+    calibration_info: dict[str, Any] | None = None,
+    model_name: str | None = None,
+    image_width: int = 1000,
+    image_height: int = 1000,
+    image_data_uri: str | None = None,
 ) -> dict[str, Any]:
     """
     Build the Jinja2 template context dict from domain objects.
@@ -89,6 +97,25 @@ def _build_context(
     cost = report.cost_estimate
     esc = decision.escalation
     health = input.health_report
+
+    # Resolve image data URI if not directly provided
+    if not image_data_uri and input_image_path:
+        candidate_paths = [
+            Path(input_image_path),
+            Path("data") / input_image_path,
+            Path("data/uploads/evidence") / Path(input_image_path).name,
+            Path("uploads/evidence") / Path(input_image_path).name,
+        ]
+        for cp in candidate_paths:
+            if cp.is_file():
+                try:
+                    mime, _ = mimetypes.guess_type(str(cp))
+                    mime = mime or "image/jpeg"
+                    b64 = base64.b64encode(cp.read_bytes()).decode("ascii")
+                    image_data_uri = f"data:{mime};base64,{b64}"
+                    break
+                except Exception:
+                    pass
 
     # ── Severity breakdown ────────────────────────────────────────────────
     severity_breakdown: list[dict[str, Any]] = []
@@ -174,6 +201,33 @@ def _build_context(
     )
     missing_inputs = ass_meta.get("missing_inputs", [])
 
+    # ── Enrich Detections with Numbered Markers ───────────────────────────
+    enriched_detections: list[dict[str, Any]] = []
+    for idx, d in enumerate(detections or []):
+        det_item = dict(d)
+        det_item["item_number"] = idx + 1
+        if not det_item.get("ref_id"):
+            det_item["ref_id"] = f"CRK-{idx + 1:02d}"
+
+        if det_item.get("marker_x") is None:
+            poly_str = det_item.get("polygon_points", "")
+            if poly_str:
+                try:
+                    pairs = [tuple(map(float, pt.split(","))) for pt in poly_str.strip().split() if "," in pt]
+                    if pairs:
+                        det_item["marker_x"] = round(sum(p[0] for p in pairs) / len(pairs), 1)
+                        det_item["marker_y"] = round(sum(p[1] for p in pairs) / len(pairs), 1)
+                except Exception:
+                    pass
+            if det_item.get("marker_x") is None and det_item.get("bbox_norm"):
+                try:
+                    bx1, by1, bx2, by2 = det_item["bbox_norm"]
+                    det_item["marker_x"] = round(((bx1 + bx2) / 2) * image_width, 1)
+                    det_item["marker_y"] = round(((by1 + by2) / 2) * image_height, 1)
+                except Exception:
+                    pass
+        enriched_detections.append(det_item)
+
     return {
         # Asset identity
         "asset_id": input.asset_id,
@@ -185,13 +239,13 @@ def _build_context(
         # Health assessment
         "health_score_formatted": f"{health.health_score:.1f}",
         "risk_level": health.risk_level.value,
-        "risk_level_color": _RISK_LEVEL_COLORS.get(health.risk_level.value, "#495057"),
+        "risk_level_color": _RISK_LEVEL_COLORS.get(health.risk_level.value, "#77766D"),
         # Defects
         "severity_breakdown": severity_breakdown,
         "failure_modes": failure_modes,
         # Decision
         "recommended_action": decision.recommended_action.value,
-        "action_color": _ACTION_COLORS.get(decision.recommended_action.value, "#495057"),
+        "action_color": _ACTION_COLORS.get(decision.recommended_action.value, "#77766D"),
         "next_inspection_formatted": f"{decision.next_inspection_interval_years:.2f}",
         # Escalation trace
         "baseline_action": esc.baseline_action.value,
@@ -205,7 +259,19 @@ def _build_context(
         "cost_basis": cost.basis,
         # Photographic Evidence & Defect Inventory
         "input_image_path": input_image_path,
-        "detections": detections or [],
+        "image_data_uri": image_data_uri,
+        "detections": enriched_detections,
+        "defect_count": len(enriched_detections),
+        "counting_method": "Instance segmentation connected components with morphological skeletonization",
+        "image_width": image_width,
+        "image_height": image_height,
+        "image_quality": image_quality or {},
+        "calibration": calibration_info or {},
+        "model_name": model_name or ass_meta.get("model_name", "shm_ai_crack_seg_finetune_15e_best.pt"),
+        "depth_disclosure": (
+            "Subsurface crack depth cannot be measured from 2D optical surface photography. "
+            "Ultrasonic pulse velocity (UPV) or impact-echo non-destructive testing is required to quantify penetration."
+        ),
         # Methodology & Governance
         "assessment_method": assessment_method,
         "data_sources": data_sources,
@@ -249,6 +315,12 @@ class ReportGenerator:
         input_image_path: str | None = None,
         detections: list[dict[str, Any]] | None = None,
         assessment_meta: dict[str, Any] | None = None,
+        image_quality: dict[str, Any] | None = None,
+        calibration_info: dict[str, Any] | None = None,
+        model_name: str | None = None,
+        image_width: int = 1000,
+        image_height: int = 1000,
+        image_data_uri: str | None = None,
     ) -> str:
         """Render the report as an HTML string."""
         template = self._env.get_template(self.TEMPLATE_NAME)
@@ -261,6 +333,12 @@ class ReportGenerator:
             input_image_path=input_image_path,
             detections=detections,
             assessment_meta=assessment_meta,
+            image_quality=image_quality,
+            calibration_info=calibration_info,
+            model_name=model_name,
+            image_width=image_width,
+            image_height=image_height,
+            image_data_uri=image_data_uri,
         )
         return template.render(**context)
 
@@ -273,6 +351,12 @@ class ReportGenerator:
         input_image_path: str | None = None,
         detections: list[dict[str, Any]] | None = None,
         assessment_meta: dict[str, Any] | None = None,
+        image_quality: dict[str, Any] | None = None,
+        calibration_info: dict[str, Any] | None = None,
+        model_name: str | None = None,
+        image_width: int = 1000,
+        image_height: int = 1000,
+        image_data_uri: str | None = None,
     ) -> bytes:
         """Render the report as a PDF byte stream."""
         try:
@@ -291,5 +375,11 @@ class ReportGenerator:
             input_image_path=input_image_path,
             detections=detections,
             assessment_meta=assessment_meta,
+            image_quality=image_quality,
+            calibration_info=calibration_info,
+            model_name=model_name,
+            image_width=image_width,
+            image_height=image_height,
+            image_data_uri=image_data_uri,
         )
         return cast("bytes", weasyprint.HTML(string=html).write_pdf())

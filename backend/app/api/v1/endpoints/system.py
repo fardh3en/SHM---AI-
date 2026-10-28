@@ -69,7 +69,8 @@ async def platform_info() -> dict:
         "environment": _settings.APP_ENV,
         "debug": _settings.DEBUG,
         "api_prefix": _settings.API_V1_PREFIX,
-        "default_model": _settings.DEFAULT_MODEL_NAME,
+        "default_model": _settings.default_model_path.name,
+        "active_model_path": str(_settings.default_model_path),
         "inference_device": _settings.INFERENCE_DEVICE,
         "vision_runtime": vision_info,
     }
