@@ -37,25 +37,30 @@ The **SHM-AI Frontend** is a modern single-page application built for structural
 ### 2. Vision Analysis Studio (`/vision`)
 - **Location**: `src/features/vision/`
 - **Functionality**:
-  - Side-by-side inspection viewer (original photographic source vs. localized defect view).
-  - SVG bounding box overlays and translucent segmentation masks.
-  - Defect metrics breakdown (confidence score, length, width, area, and classification).
-  - Defect category filtering (cracks, spalls, corrosion, delamination).
+  - Split-screen comparison (original survey photography vs. YOLO26/YOLO11 defect localization canvas).
+  - Prominent **Generate Engineering Report** button enabling 1-click dossier compilation for completed inspections with live preview redirection.
+  - Ergonomic two-row toolbar layout separating inspection selectors from operational actions.
+  - Interactive **Metric Scale Calibration Tool** (Ground Sampling Distance governance, mm/px unit toggles, and calibration badges).
+  - Ad-hoc testing with **Analyze Another Image** direct upload and inspection creation.
+  - Interactive SVG defect overlays with translucent polygon masks and hover telemetry cards.
 
 ### 3. Inspection Studio (`/inspections`)
 - **Location**: `src/features/inspections/`
-- **Workflow**:
-  - Step 1: Asset selection or registration.
-  - Step 2: Photographic evidence upload or catalog selection.
-  - Step 3: Vision pipeline execution with real-time feedback.
-  - Step 4: Diagnostic Findings card with fallback handling, weight provisioning warnings, and "Attach Evidence & Retry" actions.
+- **Workflow & Continuity**:
+  - Deep linking and state continuity via `?inspectionId=...` and `?assetId=...` query parameters.
+  - Automatic preloading of persisted evidence and inspection state, eliminating redundant image re-uploads.
+  - Visual status banner: "Continuing Inspection <id>" with an explicit "Start New Inspection" action to reset state cleanly.
+  - 4-Step guided inspection execution: Asset Selection → Evidence Attachment → Vision Pipeline Execution → Diagnostic Findings.
+  - Findings Card featuring quick-action shortcuts to Vision Studio and instant Engineering Report compilation.
 
 ### 4. Engineering Reports (`/reports`)
 - **Location**: `src/features/reports/`
 - **Functionality**:
-  - Compilation of official structural health dossiers.
-  - In-browser interactive preview of Jinja2 HTML dossiers.
-  - One-click HTML dossier download and print-ready PDF styling.
+  - Compilation of official structural engineering dossiers rendered in the **Architectural Olive & Sand** design identity.
+  - Real-time in-browser live iframe preview with deep linking support (`?reportFile=...`).
+  - Report archive registry with per-row **Preview** switching to inspect historical dossiers instantly.
+  - Standalone portability: Self-contained base64 Data URIs embedded directly into HTML documents for offline viewing without broken images.
+  - One-click HTML dossier download and print-ready PDF export styling.
 
 ### 5. Asset Registry & Details (`/assets` & `/assets/:id`)
 - **Location**: `src/features/assets/`

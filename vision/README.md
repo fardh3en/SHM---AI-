@@ -1,8 +1,8 @@
-# Vision Engine — Phase 2 & Phase 6
+# Vision Engine — Phase 2 & Precision Calibration
 
 **Status**: ✅ Implemented & Integrated
 
-The **Vision Engine** performs deep-learning-based crack detection, instance segmentation, and geometric defect quantification from high-resolution structural inspection imagery.
+The **Vision Engine** performs deep-learning-based crack detection, instance segmentation, optical metric calibration, and geometric defect quantification from high-resolution structural inspection imagery.
 
 ---
 
@@ -10,9 +10,14 @@ The **Vision Engine** performs deep-learning-based crack detection, instance seg
 
 ```
 vision/
+├── calibration/                 ← Optical metric calibration & GSD governance
+│   ├── depth_interface.py       ← Camera optics, sensor pitch & standoff distance
+│   ├── image_quality.py         ← Laplacian sharpness, blur, and contrast metrics
+│   ├── measurement_engine.py    ← Pixel-to-metric geometric scaling (mm, mm²)
+│   └── schemas.py               ← Calibration contracts & data models
 ├── detectors/
 │   ├── base.py                  ← Abstract IDetector interface & RawDetection
-│   └── yolo.py                  ← YOLO11 instance segmentation & YOLOv8 crack detection
+│   └── yolo.py                  ← YOLO26/YOLO11 instance segmentation & YOLOv8 detector
 ├── pipeline/
 │   ├── base.py                  ← Abstract IPipeline interface
 │   └── cv_pipeline.py           ← End-to-end computer vision pipeline orchestrator
@@ -32,11 +37,12 @@ vision/
 
 ## Available Model Weights
 
-The platform maintains three model options in `weights/`. Model selection is dynamic and managed through application configuration without code changes.
+The platform maintains model options in `weights/`. Model selection is dynamic and managed through application configuration without code changes.
 
 | Model / Checkpoint | Alias | Architecture | Task | Classes | Purpose |
 |---|---|---|---|---|---|
-| `shm_ai_crack_seg_finetune_15e_best.pt` | `yolo11n-crack-seg` | YOLO11n-seg | Instance Segmentation | `{0: "crack"}` | **Recommended:** Fine-tuned concrete crack segmentation. Produces pixel-level masks, GeoJSON polygons, and morphological centerline skeleton metrics. |
+| `shm_ai_yolo26n_seg_15e_best.pt` | `yolo26n-crack-seg` | YOLO26n-seg | Instance Segmentation | `{0: "crack"}` | **Recommended:** YOLO26 concrete crack segmentation. Produces high-fidelity pixel-level masks, GeoJSON polygons, and centerline skeleton metrics. |
+| `shm_ai_crack_seg_finetune_15e_best.pt` | `yolo11n-crack-seg` | YOLO11n-seg | Instance Segmentation | `{0: "crack"}` | Fine-tuned concrete crack segmentation. Produces pixel-level masks, GeoJSON polygons, and morphological centerline skeleton metrics. |
 | `crack_yolov8n_concrete.pt` | `crack_yolov8n_concrete` | YOLOv8n | Object Detection | `{0: "crack"}` | Fast bounding-box concrete crack detector. Bounding boxes only (no pixel segmentation masks). |
 | `yolo11n-seg.pt` | `yolo11n-seg` | YOLO11n-seg | Instance Segmentation | 80 COCO classes | Base pre-trained model (general objects). Unvalidated for structural crack assessment. |
 
@@ -71,22 +77,25 @@ The `shm_ai_crack_seg_finetune_15e_best.pt` checkpoint was fine-tuned on Kaggle 
 Configure the active model in `.env` or runtime environment variables:
 
 ```bash
-# Option 1: Friendly alias for fine-tuned segmentation model
+# Option 1: Friendly alias for YOLO26 segmentation model
+DEFAULT_MODEL_NAME=yolo26n-crack-seg
+
+# Option 2: Friendly alias for fine-tuned YOLO11 model
 DEFAULT_MODEL_NAME=yolo11n-crack-seg
 
-# Option 2: Direct checkpoint filename
-DEFAULT_MODEL_NAME=shm_ai_crack_seg_finetune_15e_best.pt
+# Option 3: Direct checkpoint filename
+DEFAULT_MODEL_NAME=shm_ai_yolo26n_seg_15e_best.pt
 
-# Option 3: Detection-only YOLOv8 model
+# Option 4: Detection-only YOLOv8 model
 DEFAULT_MODEL_NAME=crack_yolov8n_concrete
 
-# Option 4: Explicit absolute or relative path (highest precedence)
-MODEL_PATH=weights/shm_ai_crack_seg_finetune_15e_best.pt
+# Option 5: Explicit absolute or relative path (highest precedence)
+MODEL_PATH=weights/shm_ai_yolo26n_seg_15e_best.pt
 ```
 
 ### Resolution Precedence:
 1. `MODEL_PATH`: If set, takes absolute precedence (resolved relative to project root if not absolute). Missing target raises `ModelNotFoundError`.
-2. `DEFAULT_MODEL_NAME` (alias): Resolves alias mappings (`yolo11n-crack-seg`, `crack_yolov8n_concrete`, `yolo11n-seg`).
+2. `DEFAULT_MODEL_NAME` (alias): Resolves alias mappings (`yolo26n-crack-seg`, `yolo11n-crack-seg`, `crack_yolov8n_concrete`, `yolo11n-seg`).
 3. `DEFAULT_MODEL_NAME` (filename/path): Checked against `WEIGHTS_DIR`.
 
 Inference execution remains synchronous and non-blocking via background worker threads in FastAPI services.

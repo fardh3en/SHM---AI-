@@ -11,10 +11,11 @@
 [![React](https://img.shields.io/badge/React-18.3-61DAFB.svg)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.6-3178C6.svg)](https://www.typescriptlang.org/)
 [![Three.js](https://img.shields.io/badge/Three.js-r186-black.svg)](https://threejs.org/)
-[![PyTorch](https://img.shields.io/badge/PyTorch-YOLO11-EE4C2C.svg)](https://ultralytics.com/)
-[![Tests](https://img.shields.io/badge/Tests-440%20Passed-success.svg)](https://pytest.org/)
-[![Status](https://img.shields.io/badge/Status-Phase%206%20Complete-success.svg)](#current-progress)
-[![Version](https://img.shields.io/badge/Version-v0.6.0-blue.svg)](https://github.com/fardh3en/SHM---AI-)
+[![PyTorch](https://img.shields.io/badge/PyTorch-YOLO11%20%7C%20YOLO26-EE4C2C.svg)](https://ultralytics.com/)
+[![Tests](https://img.shields.io/badge/Tests-660+%20Passing-success.svg)](https://pytest.org/)
+[![Workflow](https://img.shields.io/badge/Workflow-9%2F9%20Verified-success.svg)](scripts/verify_workflow.py)
+[![Status](https://img.shields.io/badge/Status-Active%20Engineering%20Platform-success.svg)](#implementation-progress)
+[![Version](https://img.shields.io/badge/Version-v0.7.0-blue.svg)](https://github.com/fardh3en/SHM---AI-)
 
 </div>
 
@@ -25,21 +26,22 @@
 - [Overview](#overview)
 - [System Architecture](#system-architecture)
 - [Core Engineering Modules](#core-engineering-modules)
-  - [1. Computer Vision Engine](#1-computer-vision-engine)
-  - [2. Structural Health Intelligence](#2-structural-health-intelligence)
-  - [3. Material Degradation Modeling](#3-material-degradation-modeling)
-  - [4. Maintenance Recommendation Engine](#4-maintenance-recommendation-engine)
-  - [5. Interactive 3D Digital Twin](#5-interactive-3d-digital-twin)
-  - [6. Vision Analysis Studio](#6-vision-analysis-studio)
-  - [7. Inspection Studio](#7-inspection-studio)
-  - [8. Automated Engineering Reports](#8-automated-engineering-reports)
+  - [1. Computer Vision & Segmentation Engine](#1-computer-vision--segmentation-engine)
+  - [2. Optical Metric Calibration & GSD Governance](#2-optical-metric-calibration--gsd-governance)
+  - [3. Structural Health Intelligence](#3-structural-health-intelligence)
+  - [4. Material Degradation Modeling](#4-material-degradation-modeling)
+  - [5. Maintenance Recommendation Engine](#5-maintenance-recommendation-engine)
+  - [6. Interactive 3D Digital Twin](#6-interactive-3d-digital-twin)
+  - [7. Vision Analysis Studio & Report Integration](#7-vision-analysis-studio--report-integration)
+  - [8. Inspection Studio & Continuity Workflow](#8-inspection-studio--continuity-workflow)
+  - [9. Architectural Dossiers & Engineering Reports](#9-architectural-dossiers--engineering-reports)
 - [Project Directory Structure](#project-directory-structure)
 - [Implementation Progress](#implementation-progress)
 - [Technology Stack](#technology-stack)
 - [Getting Started](#getting-started)
   - [Prerequisites](#prerequisites)
   - [Backend Setup](#backend-setup)
-  - [Model Weights Provisioning](#model-weights-provisioning)
+  - [Model Weights Provisioning & Selection](#model-weights-provisioning--selection)
   - [Evidence & Database Seeding](#evidence--database-seeding)
   - [Running the Backend API](#running-the-backend-api)
   - [Frontend Setup & Dev Server](#frontend-setup--dev-server)
@@ -57,12 +59,13 @@
 Traditional inspection workflows rely on manual visual checks, disjointed paper reports, and subjective damage categorizations. SHM-AI unifies the end-to-end inspection lifecycle into an automated, deterministic, and verifiable pipeline:
 
 1. **Photographic & Sensor Ingestion**: High-resolution drone, handheld, or sensor imagery attached to structured asset records.
-2. **Defect Localization & Quantification**: Ultralytics YOLO11 instance segmentation, overlap-aware image slicing, morphological skeletonization, and pixel-to-millimeter metric estimation.
-3. **Engineering Assessment**: Codified structural mechanics (ACI 318 / Eurocode 2) assessing failure modes, severity levels, and computing a deterministic 0–100 Health Score.
-4. **Degradation & Service Life Projection**: Physics-based Tuutti diffusion models evaluating concrete carbonation depth, depassivation horizons, and chloride-induced rebar corrosion propagation.
-5. **Actionable Recommendations**: Algorithmic intervention classification (Monitor, Inspect, Repair, Replace, Emergency), budget forecasting, and scheduled maintenance timelines.
-6. **Interactive 3D Digital Twins**: Three.js parametric visualization across six core civil typologies (Bridges, Flyovers/Roads, Dams, Tunnels, Buildings, Pipelines) with defect heatmap projection and component picking.
-7. **Official Dossiers & Engineering Reports**: Jinja2 templated engineering documentation compiling diagnostics, defect telemetry, and maintenance plans for executive review and printable archival.
+2. **Defect Localization & Instance Segmentation**: Ultralytics YOLO26 / YOLO11 instance segmentation, overlap-aware image slicing, morphological skeletonization, and topological crack graph extraction.
+3. **Metric Scale Calibration**: Ground Sampling Distance (GSD) governance and pixel-to-millimeter physical conversion tools, strictly distinguishing optical pixel space from calibrated physical dimensions.
+4. **Engineering Assessment**: Codified structural mechanics (ACI 318 / Eurocode 2) assessing failure modes, severity levels, and computing a deterministic 0–100 Health Score.
+5. **Degradation & Service Life Projection**: Physics-based Tuutti diffusion models evaluating concrete carbonation depth, depassivation horizons, and chloride-induced rebar corrosion propagation.
+6. **Actionable Recommendations**: Algorithmic intervention classification (Monitor, Inspect, Repair, Replace, Emergency), budget forecasting, and scheduled maintenance timelines.
+7. **Interactive 3D Digital Twins**: Three.js parametric visualization across six core civil typologies (Bridges, Flyovers/Roads, Dams, Tunnels, Buildings, Pipelines) with defect heatmap projection and component picking.
+8. **Editorial Engineering Dossiers**: Automated generation of publication-quality structural engineering reports featuring the **Architectural Olive & Sand** design identity, numbered defect pins matching an interactive inventory, and self-contained base64 image embeds for standalone portability.
 
 ---
 
@@ -75,17 +78,18 @@ flowchart TD
         C[Asset Registry & Structural Metadata] --> D[(Async SQLite / PostgreSQL)]
     end
 
-    subgraph VISION ["2. Vision Pipeline"]
+    subgraph VISION ["2. Vision & Calibration Engine"]
         B --> E[Image Slicer: 640x640 with 40% Overlap]
-        E --> F[YOLO11 Instance Segmentation]
+        E --> F[YOLO26 / YOLO11 Instance Segmentation]
         F --> G[Mask OR-Fusion & Bounding Box Projection]
         G --> H[Morphological Skeletonization & NetworkX Graph]
         H --> I[Defect Metrics: Length, Width, Area, Confidence]
+        I --> I2[GSD Metric Scale Calibration: mm & mm²]
     end
 
     subgraph INTELLIGENCE ["3. Structural Health Intelligence"]
-        I --> J[Engineering Rules Engine: Failure Mode Mapping]
-        I --> K[Severity Classifier: CRITICAL / HIGH / MED / LOW]
+        I2 --> J[Engineering Rules Engine: Failure Mode Mapping]
+        I2 --> K[Severity Classifier: CRITICAL / HIGH / MED / LOW]
         J & K --> L[Health Scorer: Deterministic 0-100 Score]
         L --> M[Risk Aggregation & Escalation Engine]
     end
@@ -96,18 +100,19 @@ flowchart TD
         O --> P[Service Life Estimation & Depassivation]
     end
 
-    subgraph RECOMMENDATION ["5. Maintenance Engine"]
+    subgraph RECOMMENDATION ["5. Maintenance & Reporting Engine"]
         L & M & P --> Q[Maintenance Decision Logic]
         Q --> R[Parametric Cost & Timeline Estimator]
-        R --> S[Jinja2 Engineering Dossier Generator]
+        R --> S[Architectural Olive & Sand Dossier Generator]
+        S --> S2[Standalone Base64 Data URI Image Embedding]
     end
 
-    subgraph PRESENTATION ["6. React 18 + Three.js Digital Twin"]
-        D & I & L & S --> T[Executive Dashboard]
-        D & I & L & S --> U[Interactive 3D Structural Health Twin]
-        D & I & L & S --> V[Vision Analysis Studio]
-        D & I & L & S --> W[4-Step Inspection Studio]
-        D & I & L & S --> X[Engineering Reports Viewer & PDF Export]
+    subgraph PRESENTATION ["6. React 18 + Three.js Digital Workspace"]
+        D & I2 & L & S2 --> T[Executive KPI Dashboard]
+        D & I2 & L & S2 --> U[Interactive 3D Structural Health Twin]
+        D & I2 & L & S2 --> V[Vision Analysis Studio & Direct Report Action]
+        D & I2 & L & S2 --> W[Inspection Studio with Deep Continuity]
+        D & I2 & L & S2 --> X[Engineering Reports Viewer & Live Preview]
     end
 ```
 
@@ -115,18 +120,30 @@ flowchart TD
 
 ## Core Engineering Modules
 
-### 1. Computer Vision Engine
-- **Model**: Ultralytics YOLO11 instance segmentation (`yolo11n-seg.pt` or custom structural weights).
+### 1. Computer Vision & Segmentation Engine
+- **Supported Architectures**:
+  - **YOLO26 Instance Segmentation** (`shm_ai_yolo26n_seg_15e_best.pt`): State-of-the-art segmentation producing high-fidelity crack masks and GeoJSON boundary polygons.
+  - **Fine-Tuned YOLO11 Segmentation** (`shm_ai_crack_seg_finetune_15e_best.pt`): Fine-tuned concrete defect segmentation model yielding mask precision up to 73.7% and specificity > 99%.
+  - **Base YOLO11 Pretrained** (`yolo11n-seg.pt`): Baseline fallback model.
+  - **YOLOv8 Bounding-Box Detection** (`crack_yolov8n_concrete.pt`): Fast object detection for rapid screening.
+- **Dynamic Model Selection & Aliases**: Configurable via `DEFAULT_MODEL_NAME` or `MODEL_PATH` with automated alias mapping (`yolo26n-crack-seg`, `yolo11n-crack-seg`, `crack_yolov8n_concrete`, `yolo11n-seg`).
 - **High-Resolution Slicing**: Slices large-format structural images into 640×640 tiles with 40% spatial overlap to detect hairline fractures without downsampling artifacts.
-- **Topological Analysis**: Uses morphological skeletonization (`skimage.morphology.skeletonize`) and 8-connectivity convolution kernels to build NetworkX graphs, accurately extracting branch lengths, widths, and junction topologies.
-- **Measurement Precision**: Extrapolates physical crack dimensions, area bounding envelopes, and GeoJSON-compatible polygon coordinates.
+- **Topological Crack Analysis**: Morphological skeletonization (`skimage.morphology.skeletonize`) and 8-connectivity convolution kernels construct NetworkX graphs, accurately extracting branch lengths, maximum opening widths, and junction topologies.
 
-### 2. Structural Health Intelligence
+### 2. Optical Metric Calibration & GSD Governance
+- **Dedicated Calibration Package** (`vision/calibration/`):
+  - `measurement_engine.py`: Governs physical conversion of pixel geometries into millimeters ($mm$) and square millimeters ($mm^2$).
+  - `image_quality.py`: Evaluates image sharpness (Laplacian variance), contrast distribution, and illumination adequacy.
+  - `depth_interface.py`: Computes Ground Sampling Distance (GSD) based on sensor pitch, focal length, and standoff distance:
+    $$\text{GSD} = \frac{\text{Sensor Pitch} \times \text{Distance}}{\text{Focal Length}}$$
+- **Calibration Truth Policy**: When optical calibration is unavailable, physical dimensions are never fabricated. Measurements remain explicitly flagged as `uncalibrated_pixel_space` to maintain civil engineering compliance.
+
+### 3. Structural Health Intelligence
 - **Deterministic 0–100 Health Score**: Evaluates defect quantity, area densities, and critical structural positions.
 - **Failure Mode Inference**: Maps crack morphology and orientation to fundamental structural mechanisms (e.g., vertical shear in web walls, flexural tension at mid-span, diagonal shear at support boundaries, punching shear around column connections).
 - **Severity Classification**: Adheres to international concrete structural standards (ACI 224R-01, Eurocode 2) classifying damage into `CRITICAL`, `HIGH`, `MEDIUM`, or `LOW`.
 
-### 3. Material Degradation Modeling
+### 4. Material Degradation Modeling
 - **Decoupled Physics**: Standalone deterministic engineering models with zero ORM coupling.
 - **Carbonation Model**: Simulates carbonation front progression via square-root-of-time diffusion:
   $$d_c(t) = k_c \cdot \sqrt{t}$$
@@ -135,7 +152,7 @@ flowchart TD
   $$\text{Corrosion Index} = 1 - e^{-\tau / \tau_{\text{sat}}}$$
 - **Conservative Maintenance Trigger**: Automatically triggers maintenance requirements if observed severe physical defects are present, even if theoretical carbonation has not reached depth cover.
 
-### 4. Maintenance Recommendation Engine
+### 5. Maintenance Recommendation Engine
 - **Intervention Classifier**: Translates health scores and risk profiles into actionable directives:
   - `75–100`: **Monitor** (scheduled re-inspection cycle)
   - `50–74`: **Inspect** (NDT acoustic/ultrasonic testing)
@@ -143,7 +160,7 @@ flowchart TD
   - `0–24`: **Emergency** (immediate load restriction and structural intervention)
 - **Parametric Cost Estimator**: Quantifies mobilization, labor, and material costs based on defect type, surface square footage, and access constraints.
 
-### 5. Interactive 3D Digital Twin
+### 6. Interactive 3D Digital Twin
 - **Three.js WebGL Engine**: Responsive, hardware-accelerated 3D viewport embedded in the web workspace.
 - **Typology Geometries**: Parametric structural models customized for actual civil asset classifications:
   - **Bridges**: Decks, support piers, abutments, cable-stayed/suspension towers.
@@ -154,22 +171,36 @@ flowchart TD
   - **Pipelines**: Cylindrical conduits, joint collars, cradle supports.
 - **Interactive Capabilities**: Component selection, camera focus/reset, defect severity heatmap shading, and attached inspection evidence linking.
 
-### 6. Vision Analysis Studio
-- **Dual Photographic Viewports**: Split-screen juxtaposition of original photographic evidence against the YOLOv11 defect localization canvas.
-- **Vector Overlays**: Interactive SVG bounding boxes, translucent polygon masks, and hover inspection cards.
-- **Defect Metrics Breakdown**: Confidence scores, millimeter width/length measurements, and automated classification summaries.
+### 7. Vision Analysis Studio & Report Integration
+- **Direct Engineering Report Workflow**: Prominent `Generate Engineering Report` button on completed inspections. Compiles the official structural dossier and immediately transitions to live interactive preview (`/reports?reportFile=...`) with duplicate-submission protection.
+- **Responsive Toolbar Layout**: Ergonomic two-row control structure separating inspection selection (`.selectorRow`) from actionable operations (`.actionsRow`).
+- **Interactive Scale Calibration Tool**: Built-in GSD ruler allowing engineers to set or override the optical scale ratio, toggle between millimeter and pixel readouts, and inspect status badges (`Calibrated` vs `Requires Calibration`).
+- **Ad-Hoc Inspection Execution**: "Analyze Another Image" button enables rapid testing of arbitrary survey imagery with instant inspection initialization.
+- **Dual Photographic Viewports**: Split-screen juxtaposition of original survey photography against the YOLO26 defect localization canvas with SVG overlays and hover inspection cards.
 
-### 7. Inspection Studio
-- **Guided 4-Step Pipeline**:
+### 8. Inspection Studio & Continuity Workflow
+- **State Continuity Deep Linking**: Full support for `?inspectionId=...` and `?assetId=...` route parameters. Pre-loads existing inspection telemetry and uploaded evidence, eliminating redundant re-uploads.
+- **Inspection Lifecycle Banner**: Prominent "Continuing Inspection <id>" header with an explicit "Start New Inspection" button to reset form state cleanly.
+- **4-Step Guided Pipeline**:
   1. *Asset Selection*: Choose from verified assets or create new records.
   2. *Evidence Attachment*: Upload high-resolution inspection imagery or select from verified asset archives.
-  3. *Pipeline Execution*: Trigger automated YOLOv11 segmentation and intelligence scoring.
-  4. *Diagnostic Recovery & Findings*: Comprehensive findings report with interactive retry, evidence validation, and weight provisioning guides.
+  3. *Pipeline Execution*: Trigger automated YOLO26 / YOLO11 segmentation and intelligence scoring.
+  4. *Diagnostic Findings*: Findings card with quick links to Vision Studio and one-click Engineering Report compilation.
 
-### 8. Automated Engineering Reports
-- **Jinja2 HTML Templating**: Formats comprehensive structural audit documents.
-- **Executive Dossier**: Synthesizes structural specs, detected defects, health indices, degradation forecasts, and recommended remedial timelines.
-- **Export Formats**: In-browser interactive preview, direct HTML download, and print-ready PDF styling.
+### 9. Architectural Dossiers & Engineering Reports
+- **Architectural Olive & Sand Visual Identity**: Publication-grade structural engineering dossier styling:
+  - Deep Olive (`#353B32`): Headings, brand accents, and primary text.
+  - Warm Ivory (`#F0EDE4`): Subtle editorial page canvas.
+  - Soft White (`#FAF9F5`): Clean content surfaces and reading cards.
+  - Stone Grey (`#77766D`): Secondary metadata, captions, and structural notes.
+  - Muted Terracotta (`#A65D42`): Defect highlighting, crack overlays, and critical pins.
+  - Sage (`#66765A`): Calibrated status, passing thresholds, and validated components.
+  - Muted Ochre (`#B68A48`): Medium-risk indicators and scheduled maintenance items.
+  - Deep Rust (`#9D3E32`): High/critical-risk warnings and emergency notifications.
+- **Dual Photographic Showcase**: Juxtaposes *Figure 1.1: Original Survey Photograph* against *Figure 1.2: YOLO26 AI Defect Segmentation*.
+- **Numbered Defect Annotations**: Interactive SVG centroid pins (`#1`, `#2`, ...) overlaid on inspection imagery directly cross-referenced with the Defect Inventory table.
+- **Self-Contained Base64 Data URI Embedding**: Original and annotated inspection images are embedded directly as base64 Data URIs (`data:image/...`), ensuring downloaded HTML reports remain completely standalone with zero broken images.
+- **Live In-Browser Preview & Archive**: Split-panel report viewer with real-time iframe preview, per-row preview switching from the archive table, direct PDF printing, and HTML download.
 
 ---
 
@@ -185,9 +216,10 @@ SHM-AI/
 │       ├── core/             # Logging, security, base exceptions
 │       ├── database/         # Async SQLAlchemy engine & session factory
 │       ├── models/           # Declarative ORM models (Asset, Inspection, Detection, etc.)
+│       ├── repositories/     # Data access layer (AssetRepo, InspectionRepo, DetectionRepo)
 │       ├── schemas/          # Pydantic v2 validation contracts
 │       ├── services/         # Domain business logic (AssetService, InspectionService, etc.)
-│       ├── config.py         # Type-safe configuration via Pydantic BaseSettings
+│       ├── config.py         # Type-safe configuration via Pydantic BaseSettings & Model Aliases
 │       └── main.py           # FastAPI factory, lifespan, CORS, and static file mounts
 ├── frontend/                 # React 18 + TypeScript + Vite Single-Page Application
 │   ├── src/
@@ -197,17 +229,22 @@ SHM-AI/
 │   │   │   ├── assets/       # Asset Registry and Asset Detail
 │   │   │   ├── dashboard/    # Executive KPI Dashboard
 │   │   │   ├── home/         # Landing and platform overview
-│   │   │   ├── inspections/  # 4-step Inspection Studio and Diagnostic Card
-│   │   │   ├── reports/      # Engineering Reports compiler and viewer
-│   │   │   ├── vision/       # Vision Analysis Studio with defect localization
+│   │   │   ├── inspections/  # Inspection Studio, Continuity banner, Findings Card
+│   │   │   ├── reports/      # Engineering Reports compiler, iframe preview, archive
+│   │   │   ├── vision/       # Vision Analysis Studio, GSD Calibration Tool, Defect Overlay
 │   │   │   └── visualization/# Three.js 3D Structural Health Twin
 │   │   ├── tokens/           # Design system tokens and styling variables
 │   │   ├── App.tsx           # Route definitions
 │   │   └── main.tsx          # Application entry point
 │   ├── package.json          # Frontend dependencies & scripts
 │   └── vite.config.ts        # Vite configuration & proxy settings
-├── vision/                   # Computer Vision Package
-│   ├── detectors/            # YOLO11 detector implementations
+├── vision/                   # Computer Vision & Calibration Package
+│   ├── calibration/          # Optical metric calibration & GSD governance
+│   │   ├── depth_interface.py    # Camera optics, standoff distance, and GSD calculations
+│   │   ├── image_quality.py      # Laplacian blur, illumination, and contrast assessment
+│   │   ├── measurement_engine.py # Pixel-to-millimeter metric geometry engine
+│   │   └── schemas.py            # Calibration data contracts
+│   ├── detectors/            # YOLO26, YOLO11, and YOLOv8 detector implementations
 │   ├── pipeline/             # Detection & segmentation orchestration
 │   ├── postprocessing/       # Slicing, skeletonization, NetworkX crack graphs
 │   ├── preprocessing/        # Image loading and tiling
@@ -223,20 +260,21 @@ SHM-AI/
 │   ├── corrosion.py          # Chloride depassivation & corrosion index
 │   ├── service_life.py       # Service life estimator & maintenance decision
 │   └── config.py             # Physical coefficient lookup tables
-├── recommendation/           # Actionable Maintenance Decision Engine
+├── recommendation/           # Actionable Maintenance Decision & Reporting Engine
 │   ├── engine.py             # Action classification (Monitor/Inspect/Repair/Replace)
 │   ├── cost_estimator.py     # Parametric cost calculation
-│   ├── report_generator.py   # Jinja2 HTML dossier generation
-│   └── templates/            # HTML dossier template (report.html.j2)
-├── scripts/                  # Operational & Seed Scripts
-│   ├── download_weights.py   # Automated/explicit YOLO11 weights provisioning
+│   ├── report_generator.py   # Jinja2 HTML/PDF engineering dossier generator
+│   └── templates/            # Architectural Olive & Sand template (report.html.j2)
+├── scripts/                  # Operational, Seed & Verification Scripts
+│   ├── download_weights.py   # Automated/explicit YOLO weights provisioning
 │   ├── run_dev.py            # Backend development server runner
-│   ├── seed_evidence.py      # Civil engineering archive & Wikimedia photo ingestion
-│   └── seed_db.py            # Database mock and baseline asset generator
-├── tests/                    # Test Suite (440 passing tests)
+│   ├── seed_evidence.py      # Civil engineering archive & photo ingestion
+│   ├── seed_db.py            # Database mock and baseline asset generator
+│   └── verify_workflow.py    # 9-step automated end-to-end pipeline verification
+├── tests/                    # Automated Test Suite (660+ tests)
 │   └── unit/                 # Unit tests covering backend, vision, degradation, intelligence
-├── weights/                  # Model weights storage (yolo11n-seg.pt)
-├── reports/                  # Generated HTML/PDF inspection reports
+├── weights/                  # Model weights (YOLO26, YOLO11, YOLOv8)
+├── reports/                  # Generated HTML/PDF inspection dossiers
 ├── datasets/                 # Training and benchmarking datasets
 └── pyproject.toml            # Project metadata and Python dependencies
 ```
@@ -248,12 +286,13 @@ SHM-AI/
 | Phase | Description | Status |
 |:---|:---|:---:|
 | **Phase 1: Backend Foundation** | FastAPI architecture, Async SQLAlchemy, SQLite/PostgreSQL, CRUD models | ✅ Complete |
-| **Phase 2: Vision Engine** | YOLO11 instance segmentation, sliced inference, skeletonization, crack graphs | ✅ Complete |
+| **Phase 2: Vision Engine** | YOLO11/YOLO26 instance segmentation, sliced inference, skeletonization, crack graphs | ✅ Complete |
 | **Phase 3: Structural Intelligence** | 0–100 Health Score, failure mode mapping, severity classification, risk engine | ✅ Complete |
 | **Phase 4: Material Degradation** | Deterministic Tuutti carbonation model, chloride corrosion, service life | ✅ Complete |
 | **Phase 5: Recommendation & Reports**| Maintenance decision engine, cost estimator, Jinja2 engineering dossiers | ✅ Complete |
 | **Phase 6: Web Engineering Workspace**| React 18 + Vite, Three.js 3D Health Visualizer, Vision Studio, Inspection Studio | ✅ Complete |
-| **Phase 7: Production Deployment** | Multi-stage Docker, GPU inference containerization, Nginx, CI/CD pipeline | 🔜 Planned |
+| **Phase 7: Precision & Dossier Workflow** | YOLO26 integration, GSD metric calibration, Architectural Olive & Sand dossier redesign, standalone base64 embeds, and direct vision report workflow | ✅ Complete |
+| **Phase 8: Production Deployment** | Multi-stage Docker, GPU inference containerization, Nginx, CI/CD pipeline | 🔜 Planned |
 
 ---
 
@@ -266,9 +305,10 @@ SHM-AI/
 | **Data Validation** | Schema Contracts | Pydantic v2, Pydantic-Settings |
 | **Frontend UI** | Client Workspace | React 18.3, TypeScript 5.6, Vite 6.0, Tailwind CSS |
 | **3D Graphics** | WebGL Visualization | Three.js r186, OrbitControls |
-| **Computer Vision** | Deep Learning & Geometry | Ultralytics YOLO11, PyTorch, OpenCV, Scikit-Image, NetworkX, Shapely |
-| **Reporting** | Document Generation | Jinja2, WeasyPrint |
-| **Testing** | Verification | Pytest (pytest-asyncio, pytest-cov), ESLint, TypeScript `tsc` |
+| **Computer Vision** | Deep Learning & Geometry | Ultralytics YOLO26 / YOLO11, PyTorch, OpenCV, Scikit-Image, NetworkX, Shapely |
+| **Optical Calibration** | Metric Scale & GSD | NumPy, Scikit-Image, Ground Sampling Distance algorithms |
+| **Reporting** | Document Generation | Jinja2, WeasyPrint, Base64 Data URI image embedding |
+| **Testing & QA** | Verification Suite | Pytest, pytest-asyncio, pytest-cov, ESLint, TypeScript `tsc`, `verify_workflow.py` |
 
 ---
 
@@ -303,16 +343,30 @@ SHM-AI/
    pip install -e ".[dev,vision,reports]"
    ```
 
-### Model Weights Provisioning
+### Model Weights Provisioning & Selection
 
-SHM-AI includes an automated weight provisioner with user consent validation:
+SHM-AI supports multiple model architectures stored in the `weights/` directory.
 
+| Checkpoint File | Alias | Task | Description |
+|:---|:---|:---|:---|
+| `shm_ai_yolo26n_seg_15e_best.pt` | `yolo26n-crack-seg` | Instance Segmentation | **Recommended:** YOLO26 concrete crack segmentation model. |
+| `shm_ai_crack_seg_finetune_15e_best.pt` | `yolo11n-crack-seg` | Instance Segmentation | Fine-tuned YOLO11 segmentation model. |
+| `crack_yolov8n_concrete.pt` | `crack_yolov8n_concrete` | Object Detection | Bounding-box concrete crack detector. |
+| `yolo11n-seg.pt` | `yolo11n-seg` | Instance Segmentation | Base pre-trained model (general objects fallback). |
+
+Download base weights automatically if needed:
 ```bash
-# Non-interactive download of YOLO11 segmentation weights (~6 MB)
 python scripts/download_weights.py --yes
 ```
 
-The model file will be saved directly to `weights/yolo11n-seg.pt`.
+To configure the active model in `.env`:
+```bash
+# Set model via alias
+DEFAULT_MODEL_NAME=yolo26n-crack-seg
+
+# Or specify an explicit path (highest precedence)
+MODEL_PATH=weights/shm_ai_yolo26n_seg_15e_best.pt
+```
 
 ### Evidence & Database Seeding
 
@@ -367,29 +421,34 @@ The application will be accessible at:
 ## API Reference
 
 ### System
-- `GET /api/v1/system/health` — System status, database health, environment check.
+- `GET /api/v1/system/health` — System status, database health, and active vision model runtime.
 
 ### Asset Management
 - `GET /api/v1/assets` — Query all registered infrastructure assets.
 - `POST /api/v1/assets` — Register a new structural asset.
 - `GET /api/v1/assets/{id}` — Fetch detailed asset metadata and component definitions.
-- `PUT /api/v1/assets/{id}` — Update asset configuration.
+- `PATCH /api/v1/assets/{id}` — Update asset configuration and specifications.
 - `DELETE /api/v1/assets/{id}` — Soft/hard delete an asset record.
 
 ### Photographic Evidence
+- `POST /api/v1/evidence/upload` — Upload an inspection image file to the media repository.
+- `POST /api/v1/assets/{id}/evidence/upload` — Upload and attach inspection image directly to an asset.
 - `GET /api/v1/assets/{id}/evidence` — List photographic evidence attached to an asset.
-- `POST /api/v1/assets/{id}/evidence` — Upload high-resolution inspection media.
+- `GET /api/v1/evidence/{evidence_id}` — Retrieve specific evidence metadata.
 
 ### Inspection Pipeline
 - `GET /api/v1/inspections` — List historical inspection records.
 - `POST /api/v1/inspections` — Initialize a new inspection session.
 - `GET /api/v1/inspections/{id}` — Get inspection state, health scores, and metrics.
-- `POST /api/v1/inspections/{id}/execute-vision` — Execute YOLO11 segmentation and structural intelligence scoring.
+- `POST /api/v1/inspections/{id}/run` — Synchronously execute computer vision pipeline and structural assessment.
 - `GET /api/v1/inspections/{id}/detections` — Retrieve defect bounding boxes, polygon coordinates, and measurements.
+- `GET /api/v1/inspections/{id}/assessment` — Retrieve explainable structural assessment and health score.
+- `POST /api/v1/inspections/{id}/recalculate-assessment` — Recalculate assessment with updated observations.
 
 ### Engineering Reports
-- `POST /api/v1/reports/inspections/{id}/generate` — Compile Jinja2 HTML structural health dossier.
-- `GET /api/v1/reports/{id}/download` — Download compiled HTML report dossier.
+- `POST /api/v1/reports/generate` — Compile formal structural inspection dossier (`ReportGenerateRequest`: `{ asset_id, inspection_id, format }`).
+- `GET /api/v1/reports/` — List all persisted engineering reports stored on the server.
+- `GET /api/v1/reports/{filename}` — View or download generated report dossier (standalone HTML or PDF).
 
 ---
 
@@ -397,8 +456,15 @@ The application will be accessible at:
 
 The codebase maintains strict automated test coverage across all domain modules.
 
-### Backend Unit Tests
-Execute the complete test suite (440 passing unit tests):
+### 1. End-to-End Workflow Verification
+Execute the automated 9-step pipeline test covering live server health, inspection continuity, report generation, base64 image embeds, Architectural Olive & Sand palette validation, and archive retrieval:
+
+```bash
+python scripts/verify_workflow.py
+```
+
+### 2. Backend Unit Tests
+Execute the complete backend test suite:
 
 ```bash
 # Run all tests
@@ -408,7 +474,7 @@ pytest tests/ -v
 pytest tests/ --cov=backend --cov=vision --cov=intelligence --cov=degradation --cov=recommendation
 ```
 
-### Frontend Verification
+### 3. Frontend Verification
 Verify type safety, code styling, and production bundle compilation:
 
 ```bash
@@ -436,12 +502,14 @@ Configuration values are managed by `backend/app/config.py` and can be overridde
 | `APP_ENV` | `development` | Runtime mode (`development`, `staging`, `production`) |
 | `DEBUG` | `true` | Enables verbose debug mode |
 | `DATABASE_URL` | `sqlite+aiosqlite:///./data/shm_ai.db` | Async connection string (supports PostgreSQL) |
-| `DEFAULT_MODEL_NAME` | `yolo11n-seg.pt` | Active YOLO segmentation model filename |
+| `DEFAULT_MODEL_NAME` | `yolo26n-crack-seg` | Active YOLO segmentation model alias or checkpoint filename |
+| `MODEL_PATH` | `None` | Optional explicit path overriding `DEFAULT_MODEL_NAME` |
 | `CONFIDENCE_THRESHOLD`| `0.25` | Minimum detection confidence |
 | `IOU_THRESHOLD` | `0.45` | Non-Maximum Suppression (NMS) intersection threshold |
 | `SLICE_HEIGHT` | `640` | Sliced inference tile height (px) |
 | `SLICE_WIDTH` | `640` | Sliced inference tile width (px) |
 | `SLICE_OVERLAP_RATIO` | `0.40` | Overlap ratio between adjacent inference tiles |
+| `CORS_ORIGINS` | `["http://localhost:3000", ...]` | Allowed CORS origins for the frontend client |
 
 ---
 

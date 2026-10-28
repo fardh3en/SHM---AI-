@@ -47,8 +47,10 @@ Calculates baseline budgetary estimates considering:
 ## Engineering Report Generation (`report_generator.py`)
 
 Generates comprehensive civil engineering dossiers using Jinja2 templates (`report.html.j2`):
-- **Executive Summary**: Asset details, assessment date, overall health index.
-- **Defect Registry**: High-resolution imagery, localized defect bounding coordinates, and confidence levels.
-- **Material Degradation Curves**: Carbonation progression and corrosion index projections.
+- **Visual Identity**: Professional **Architectural Olive & Sand** editorial styling (#353B32 deep olive, #F0EDE4 warm ivory, #FAF9F5 soft white, #77766D stone grey, #A65D42 muted terracotta, #66765A sage, #B68A48 ochre, #9D3E32 rust).
+- **Executive Summary**: Asset details, assessment date, overall deterministic 0-100 health score, and risk classification.
+- **Dual Photographic Showcase**: Juxtaposes original survey photography with YOLO26/YOLO11 defect segmentations.
+- **Numbered Defect Annotations**: Interactive SVG centroid pins (#1, #2, ...) on the survey image mapped directly to the Defect Inventory table.
+- **Self-Contained Portability**: Embeds inspection images as base64 Data URIs (`data:image/...`), ensuring downloaded HTML reports remain completely standalone with zero broken image paths.
 - **Action Plan**: Prioritized interventions with estimated budgetary ranges and engineering sign-off fields.
-- **Output Formats**: In-browser preview, stand-alone HTML, and printable PDF documents.
+- **Output Formats**: Live in-browser iframe preview, stand-alone HTML, and printable PDF documents.
